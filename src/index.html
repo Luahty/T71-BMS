@@ -676,6 +676,7 @@
               <div>
                 <div class="pack-name" id="pack1Name">Khối 1: T71P1 (15S)</div>
                 <div class="pack-sub" id="pack1Sub">Chưa kết nối</div>
+                <div class="pack-hex" id="pack1Hex" style="font-family: monospace; font-size: 10px; color: var(--primary); word-break: break-all; margin-top: 4px;"></div>
               </div>
             </div>
             <button class="btn-connect" id="btnPack1" onclick="connectPack(0)">Kết nối BLE</button>
@@ -687,6 +688,7 @@
               <div>
                 <div class="pack-name" id="pack2Name">Khối 2: T71P2 (15S)</div>
                 <div class="pack-sub" id="pack2Sub">Chưa kết nối</div>
+                <div class="pack-hex" id="pack2Hex" style="font-family: monospace; font-size: 10px; color: var(--primary); word-break: break-all; margin-top: 4px;"></div>
               </div>
             </div>
             <button class="btn-connect" id="btnPack2" onclick="connectPack(1)">Kết nối BLE</button>
@@ -920,8 +922,7 @@
     }
 
     /**
-     * Giải mã thông minh dòng byte từ JK-BMS
-     * Hỗ trợ Header chuẩn BLE (0x55 0xAA 0xEB 0x90) lẫn chuẩn cũ (0x4E 0x57)
+     * Giải mã thông minh đa thuật toán bóc tách 15 Cell LiFePO4 từ dòng byte JK-BMS
      */
     function processIncomingChunk(packIndex, rawChunk) {
       const chunk = toUint8Array(rawChunk);
@@ -929,60 +930,126 @@
 
       const pack = bmsPacks[packIndex];
       pack.bytesReceived += chunk.length;
-      document.getElementById(`pack${packIndex + 1}Sub`).textContent = `Nhận: ${pack.bytesReceived}B | ${pack.cells.length} Cell`;
 
       pack.rawBuffer = appendBytes(pack.rawBuffer, chunk);
       const buf = pack.rawBuffer;
 
-      // 1. Chuẩn Bluetooth LE JK02/JK04 (Header 0x55 0xAA 0xEB 0x90)
-      for (let i = 0; i < buf.length - 35; i++) {
-        if (buf[i] === 0x55 && buf[i + 1] === 0xAA && buf[i + 2] === 0xEB && buf[i + 3] === 0x90) {
-          const frameType = buf[i + 4];
-          if (frameType === 0x02) {
-            // Frame 0x02: Mỗi cell gồm 2 byte Little-Endian, tỷ lệ 0.001V
-            let cells = [];
+      // 1. Hiển thị 24 byte mã HEX thực tế để theo dõi trực tiếp
+      const hexEl = document.getElementById(`pack${packIndex + 1}Hex`);
+      if (hexEl && buf.length > 0) {
+        const hexStr = Array.from(buf.slice(0, 24)).map(b => b.toString(16).padStart(2, '0').toUpperCase()).join(' ');
+        hexEl.textContent = `HEX: ${hexStr}...`;
+      }
+
+      let detectedCells = [];
+
+      // THUẬT TOÁN 1: Quét mẫu chuẩn JK-BMS Tag 0x79 (Mỗi cell: 1 byte ID + 2 byte Áp Big-Endian)
+      for (let i = 0; i < buf.length - 15; i++) {
+        if (buf[i] === 0x01 && (buf[i + 1] >= 0x09 && buf[i + 1] <= 0x0F)) {
+          let testCells = [];
+          let ptr = i;
+          let expectedId = 1;
+          while (ptr + 2 < buf.length && buf[ptr] === expectedId) {
+            const v_mV = (buf[ptr + 1] << 8) | buf[ptr + 2];
+            const volt = Number((v_mV * 0.001).toFixed(3));
+            if (volt >= 2.2 && volt <= 4.2) {
+              testCells.push(volt);
+            } else {
+              break;
+            }
+            expectedId++;
+            ptr += 3;
+            if (testCells.length >= 15) break;
+          }
+          if (testCells.length >= 8) {
+            detectedCells = testCells;
+            break;
+          }
+        }
+      }
+
+      // THUẬT TOÁN 2: Quét Tag 0x79 có độ dài DataLen
+      if (detectedCells.length < 8) {
+        for (let i = 0; i < buf.length - 10; i++) {
+          if (buf[i] === 0x79) {
+            const dataLen = buf[i + 1];
+            if (dataLen >= 15 && i + 2 + dataLen <= buf.length + 10) {
+              let testCells = [];
+              let ptr = i + 2;
+              const count = Math.min(16, Math.floor(dataLen / 3));
+              for (let c = 0; c < count; c++) {
+                if (ptr + 2 < buf.length) {
+                  const v_mV = (buf[ptr + 1] << 8) | buf[ptr + 2];
+                  const volt = Number((v_mV * 0.001).toFixed(3));
+                  if (volt >= 2.0 && volt <= 4.5) {
+                    testCells.push(volt);
+                  }
+                  ptr += 3;
+                }
+              }
+              if (testCells.length >= 8) {
+                detectedCells = testCells;
+                break;
+              }
+            }
+          }
+        }
+      }
+
+      // THUẬT TOÁN 3: Chuẩn 0x55 0xAA 0xEB 0x90 (Little-Endian 2 bytes)
+      if (detectedCells.length < 8) {
+        for (let i = 0; i < buf.length - 35; i++) {
+          if (buf[i] === 0x55 && buf[i + 1] === 0xAA && buf[i + 2] === 0xEB && buf[i + 3] === 0x90) {
+            let testCells = [];
             let ptr = i + 6;
             for (let c = 0; c < 15; c++) {
               if (ptr + 1 < buf.length) {
                 const rawV = buf[ptr] | (buf[ptr + 1] << 8);
                 const volt = Number((rawV * 0.001).toFixed(3));
                 if (volt >= 2.0 && volt <= 4.5) {
-                  cells.push(volt);
+                  testCells.push(volt);
                 }
                 ptr += 2;
               }
             }
-            if (cells.length >= 14) {
-              pack.cells = cells.slice(0, 15);
+            if (testCells.length >= 8) {
+              detectedCells = testCells;
+              break;
             }
           }
         }
       }
 
-      // 2. Chuẩn Tag 0x79 (Classic UART/TLV)
-      for (let i = 0; i < buf.length - 45; i++) {
-        if (buf[i] === 0x79) {
-          const dataLen = buf[i + 1];
-          if (dataLen >= 45 && dataLen <= 72 && (i + 2 + dataLen <= buf.length)) {
-            const cellCount = Math.floor(dataLen / 3);
-            let cells = [];
-            let ptr = i + 2;
-            for (let c = 0; c < cellCount; c++) {
-              const v_mV = (buf[ptr + 1] << 8) | buf[ptr + 2];
-              const volt = Number((v_mV / 1000).toFixed(3));
-              if (volt >= 2.0 && volt <= 4.5) {
-                cells.push(volt);
-              }
-              ptr += 3;
+      // THUẬT TOÁN 4: Quét bất kỳ chuỗi 16-bit Big-Endian liên tục nào thuộc dải 2.8V - 3.8V
+      if (detectedCells.length < 8) {
+        for (let i = 0; i < buf.length - 20; i++) {
+          let testCells = [];
+          let ptr = i;
+          while (ptr + 1 < buf.length) {
+            const rawV = (buf[ptr] << 8) | buf[ptr + 1];
+            const volt = Number((rawV * 0.001).toFixed(3));
+            if (volt >= 2.5 && volt <= 3.8) {
+              testCells.push(volt);
+              ptr += 2;
+            } else {
+              break;
             }
-            if (cells.length >= 14) {
-              pack.cells = cells.slice(0, 15);
-            }
+            if (testCells.length >= 15) break;
+          }
+          if (testCells.length >= 8) {
+            detectedCells = testCells;
+            break;
           }
         }
       }
 
-      // 3. Trích xuất thông số điện áp, dòng, SOC
+      if (detectedCells.length >= 8) {
+        pack.cells = detectedCells.slice(0, 15);
+      }
+
+      document.getElementById(`pack${packIndex + 1}Sub`).textContent = `Nhận: ${pack.bytesReceived}B | ${pack.cells.length} Cell`;
+
+      // Cập nhật thông số điện áp & dòng nếu đã có cell
       if (pack.cells.length > 0) {
         pack.voltage = Number(pack.cells.reduce((a, b) => a + b, 0).toFixed(2));
 
@@ -1007,6 +1074,7 @@
         updateSystemTotals();
       }
 
+      // Giới hạn buffer chống tràn RAM
       if (buf.length > 512) {
         pack.rawBuffer = buf.slice(buf.length - 128);
       }
