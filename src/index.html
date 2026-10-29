@@ -692,6 +692,12 @@
             <button class="btn-connect" id="btnPack2" onclick="connectPack(1)">Kết nối BLE</button>
           </div>
         </div>
+
+        <div style="margin-top: 12px;">
+          <button class="btn-action-large primary" onclick="manualTriggerQueries()" style="width: 100%; justify-content: center; gap: 8px; font-size: 13px;">
+            <span>⚡ Kích Hoạt Đọc Dữ Liệu Ngay</span>
+          </button>
+        </div>
       </div>
 
       <div class="card">
@@ -873,38 +879,49 @@
 
     /**
      * Gửi lệnh truy vấn Polling Query kích hoạt JK-BMS gửi dữ liệu
+     * Hỗ trợ chuẩn Bluetooth LE: AA 55 90 EB 96 (writeWithoutResponse)
      */
     async function sendQueryCommand(packIndex) {
       const pack = bmsPacks[packIndex];
       if (!pack.connected || !pack.deviceId) return;
 
-      try {
-        if (isCapacitor && BleClient) {
-          // Lệnh truy vấn chuẩn 1: AA 55 90 EB 96 00...
-          await BleClient.write({
-            deviceId: pack.deviceId,
-            service: JK_SERVICE_UUID,
-            characteristic: JK_WRITE_CHAR_UUID,
-            value: 'aa5590eb96000000000000000000000000000011'
-          });
-        }
-      } catch (e) {
-        // Dự phòng lệnh truy vấn chuẩn 2 (chuẩn 4E 57 V11/V14)
-        try {
+      const queryCommands = [
+        'aa5590eb96000000000000000000000000000011', // Query 0x96: Cell & status stream
+        'aa5590eb97000000000000000000000000000012', // Query 0x97: Device info
+        '4e5700130000000006030000000000006800000129' // Fallback classic 4E 57
+      ];
+
+      const targetCharacteristics = [JK_WRITE_CHAR_UUID, JK_NOTIFY_CHAR_UUID];
+
+      for (const cmd of queryCommands) {
+        for (const charUuid of targetCharacteristics) {
           if (isCapacitor && BleClient) {
-            await BleClient.write({
-              deviceId: pack.deviceId,
-              service: JK_SERVICE_UUID,
-              characteristic: JK_WRITE_CHAR_UUID,
-              value: '4e5700130000000006030000000000006800000129'
-            });
+            try {
+              // Hầu hết JK-BMS nhận lệnh qua writeWithoutResponse
+              await BleClient.writeWithoutResponse({
+                deviceId: pack.deviceId,
+                service: JK_SERVICE_UUID,
+                characteristic: charUuid,
+                value: cmd
+              });
+            } catch (e) {
+              try {
+                await BleClient.write({
+                  deviceId: pack.deviceId,
+                  service: JK_SERVICE_UUID,
+                  characteristic: charUuid,
+                  value: cmd
+                });
+              } catch (e2) {}
+            }
           }
-        } catch (err) {}
+        }
       }
     }
 
     /**
-     * Giải mã thông minh dòng byte từ JK-BMS (Tự động nhận diện Tag 0x79, 0x83, 0x84, 0x85)
+     * Giải mã thông minh dòng byte từ JK-BMS
+     * Hỗ trợ Header chuẩn BLE (0x55 0xAA 0xEB 0x90) lẫn chuẩn cũ (0x4E 0x57)
      */
     function processIncomingChunk(packIndex, rawChunk) {
       const chunk = toUint8Array(rawChunk);
@@ -912,23 +929,44 @@
 
       const pack = bmsPacks[packIndex];
       pack.bytesReceived += chunk.length;
-      document.getElementById(`pack${packIndex + 1}Sub`).textContent = `Đã nhận: ${pack.bytesReceived} bytes (${pack.cells.length} Cell)`;
+      document.getElementById(`pack${packIndex + 1}Sub`).textContent = `Nhận: ${pack.bytesReceived}B | ${pack.cells.length} Cell`;
 
       pack.rawBuffer = appendBytes(pack.rawBuffer, chunk);
       const buf = pack.rawBuffer;
 
-      // Quét tìm Tag 0x79 (Cell info) trong toàn bộ buffer
-      let foundTag79 = false;
-      for (let i = 0; i < buf.length - 10; i++) {
-        // Tag 0x79 theo sau là độ dài dataLen (45 bytes cho 15 cell)
+      // 1. Chuẩn Bluetooth LE JK02/JK04 (Header 0x55 0xAA 0xEB 0x90)
+      for (let i = 0; i < buf.length - 35; i++) {
+        if (buf[i] === 0x55 && buf[i + 1] === 0xAA && buf[i + 2] === 0xEB && buf[i + 3] === 0x90) {
+          const frameType = buf[i + 4];
+          if (frameType === 0x02) {
+            // Frame 0x02: Mỗi cell gồm 2 byte Little-Endian, tỷ lệ 0.001V
+            let cells = [];
+            let ptr = i + 6;
+            for (let c = 0; c < 15; c++) {
+              if (ptr + 1 < buf.length) {
+                const rawV = buf[ptr] | (buf[ptr + 1] << 8);
+                const volt = Number((rawV * 0.001).toFixed(3));
+                if (volt >= 2.0 && volt <= 4.5) {
+                  cells.push(volt);
+                }
+                ptr += 2;
+              }
+            }
+            if (cells.length >= 14) {
+              pack.cells = cells.slice(0, 15);
+            }
+          }
+        }
+      }
+
+      // 2. Chuẩn Tag 0x79 (Classic UART/TLV)
+      for (let i = 0; i < buf.length - 45; i++) {
         if (buf[i] === 0x79) {
           const dataLen = buf[i + 1];
-          // Đối với pack 15S, dataLen thường là 45 bytes (15 * 3) hoặc 48 bytes (16 * 3)
           if (dataLen >= 45 && dataLen <= 72 && (i + 2 + dataLen <= buf.length)) {
             const cellCount = Math.floor(dataLen / 3);
             let cells = [];
             let ptr = i + 2;
-
             for (let c = 0; c < cellCount; c++) {
               const v_mV = (buf[ptr + 1] << 8) | buf[ptr + 2];
               const volt = Number((v_mV / 1000).toFixed(3));
@@ -937,54 +975,39 @@
               }
               ptr += 3;
             }
-
             if (cells.length >= 14) {
               pack.cells = cells.slice(0, 15);
-              foundTag79 = true;
-              break;
             }
           }
         }
       }
 
-      // Quét các thông số tổng áp (Tag 0x83), Dòng điện (Tag 0x84), SOC (Tag 0x85)
-      for (let i = 0; i < buf.length - 3; i++) {
-        if (buf[i] === 0x83) {
-          const v = ((buf[i + 1] << 8) | buf[i + 2]) * 0.01;
-          if (v > 35 && v < 65) {
-            pack.voltage = Number(v.toFixed(2));
-          }
-        }
-        if (buf[i] === 0x84) {
-          let rawI = (buf[i + 1] << 8) | buf[i + 2];
-          if (rawI & 0x8000) {
-            pack.current = Number((-((rawI & 0x7FFF) * 0.01)).toFixed(2));
-          } else {
-            pack.current = Number((rawI * 0.01).toFixed(2));
-          }
-        }
-        if (buf[i] === 0x85) {
-          const s = buf[i + 1];
-          if (s >= 0 && s <= 100) {
-            pack.soc = s;
-          }
-        }
-        if (buf[i] === 0x80) {
-          const t = buf[i + 1];
-          pack.temp = t > 100 ? -(t - 100) : t;
-        }
-      }
-
-      // Nếu đã có cell thì tính tổng áp từ cell nếu tag 0x83 chưa xuất hiện
+      // 3. Trích xuất thông số điện áp, dòng, SOC
       if (pack.cells.length > 0) {
-        if (pack.voltage < 35) {
-          pack.voltage = Number(pack.cells.reduce((a, b) => a + b, 0).toFixed(2));
+        pack.voltage = Number(pack.cells.reduce((a, b) => a + b, 0).toFixed(2));
+
+        for (let i = 0; i < buf.length - 3; i++) {
+          if (buf[i] === 0x84) {
+            let rawI = (buf[i + 1] << 8) | buf[i + 2];
+            pack.current = (rawI & 0x8000) ? Number((-((rawI & 0x7FFF) * 0.01)).toFixed(2)) : Number((rawI * 0.01).toFixed(2));
+          }
+          if (buf[i] === 0x85 && buf[i + 1] <= 100) {
+            pack.soc = buf[i + 1];
+          }
+          if (buf[i] === 0x80) {
+            pack.temp = buf[i + 1] > 100 ? -(buf[i + 1] - 100) : buf[i + 1];
+          }
         }
+
+        if (pack.soc === 0) {
+          const avgCell = pack.voltage / pack.cells.length;
+          pack.soc = Math.min(100, Math.max(0, Math.round(((avgCell - 3.0) / (3.45 - 3.0)) * 100)));
+        }
+
         updateSystemTotals();
       }
 
-      // Duy trì buffer cuộn gọn (giữ lại 128 bytes gần nhất)
-      if (buf.length > 384) {
+      if (buf.length > 512) {
         pack.rawBuffer = buf.slice(buf.length - 128);
       }
     }
@@ -1208,6 +1231,12 @@
       bmsPacks[1].temp = 32.0;
 
       updateSystemTotals();
+    }
+
+    function manualTriggerQueries() {
+      sendQueryCommand(0);
+      sendQueryCommand(1);
+      showToast('Đã phát lệnh kích hoạt tới T71P1 & T71P2!');
     }
 
     // Gửi Sheets
