@@ -10,7 +10,7 @@ const SHEET_NAME_EVENTS = 'Sự kiện & Thống kê';
  * Phục vụ giao diện Web App HTML
  */
 function doGet(e) {
-  var template = HtmlService.createTemplateFromFile('Index');
+  var template = HtmlService.createTemplateFromFile('index');
   return template.evaluate()
     .setTitle('T71-BMS | Hệ Thống Quản Lý Pin 96V Tailg T71')
     .addMetaTag('viewport', 'width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no')
