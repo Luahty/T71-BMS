@@ -735,10 +735,9 @@
       try {
         if (isCapacitor && BleClient) {
           // Kết nối thông qua Capacitor Native BLE Plugin (Dành cho App Android APK)
-          showToast(`Đang quét JK-BMS qua Android BLE cho ${pack.name}...`);
-          const device = await BleClient.requestDevice({
-            namePrefix: 'JK'
-          });
+          showToast(`Đang quét tất cả thiết bị BLE (Đảm bảo đã BẬT GPS)...`);
+          // Không giới hạn bộ lọc namePrefix để tìm thấy tất cả thiết bị BMS và tên tùy chỉnh
+          const device = await BleClient.requestDevice({});
 
           if (!device || !device.deviceId) {
             showToast('Không tìm thấy thiết bị');
