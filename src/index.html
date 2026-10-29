@@ -791,11 +791,12 @@
 
     const JK_SERVICE_UUID = '0000ffe0-0000-1000-8000-00805f9b34fb';
     const JK_NOTIFY_CHAR_UUID = '0000ffe1-0000-1000-8000-00805f9b34fb';
+    const JK_WRITE_CHAR_UUID = '0000ffe2-0000-1000-8000-00805f9b34fb';
 
     // Quản lý 2 khối JK-BMS (mỗi khối 15S)
     const bmsPacks = [
-      { id: 0, name: 'Khối 1 (T71P1)', deviceId: null, connected: false, voltage: 0, current: 0, soc: 0, temp: 0, cells: [], rawBuffer: new Uint8Array(0) },
-      { id: 1, name: 'Khối 2 (T71P2)', deviceId: null, connected: false, voltage: 0, current: 0, soc: 0, temp: 0, cells: [], rawBuffer: new Uint8Array(0) }
+      { id: 0, name: 'Khối 1 (T71P1)', deviceId: null, connected: false, voltage: 0, current: 0, soc: 0, temp: 0, cells: [], rawBuffer: new Uint8Array(0), queryTimer: null, bytesReceived: 0 },
+      { id: 1, name: 'Khối 2 (T71P2)', deviceId: null, connected: false, voltage: 0, current: 0, soc: 0, temp: 0, cells: [], rawBuffer: new Uint8Array(0), queryTimer: null, bytesReceived: 0 }
     ];
 
     let isSimulating = false;
@@ -871,120 +872,120 @@
     }
 
     /**
-     * Giải mã chuẩn xác khung truyền JK-BMS (Tag-Length-Value)
+     * Gửi lệnh truy vấn Polling Query kích hoạt JK-BMS gửi dữ liệu
+     */
+    async function sendQueryCommand(packIndex) {
+      const pack = bmsPacks[packIndex];
+      if (!pack.connected || !pack.deviceId) return;
+
+      try {
+        if (isCapacitor && BleClient) {
+          // Lệnh truy vấn chuẩn 1: AA 55 90 EB 96 00...
+          await BleClient.write({
+            deviceId: pack.deviceId,
+            service: JK_SERVICE_UUID,
+            characteristic: JK_WRITE_CHAR_UUID,
+            value: 'aa5590eb96000000000000000000000000000011'
+          });
+        }
+      } catch (e) {
+        // Dự phòng lệnh truy vấn chuẩn 2 (chuẩn 4E 57 V11/V14)
+        try {
+          if (isCapacitor && BleClient) {
+            await BleClient.write({
+              deviceId: pack.deviceId,
+              service: JK_SERVICE_UUID,
+              characteristic: JK_WRITE_CHAR_UUID,
+              value: '4e5700130000000006030000000000006800000129'
+            });
+          }
+        } catch (err) {}
+      }
+    }
+
+    /**
+     * Giải mã thông minh dòng byte từ JK-BMS (Tự động nhận diện Tag 0x79, 0x83, 0x84, 0x85)
      */
     function processIncomingChunk(packIndex, rawChunk) {
       const chunk = toUint8Array(rawChunk);
       if (chunk.length === 0) return;
 
       const pack = bmsPacks[packIndex];
+      pack.bytesReceived += chunk.length;
+      document.getElementById(`pack${packIndex + 1}Sub`).textContent = `Đã nhận: ${pack.bytesReceived} bytes (${pack.cells.length} Cell)`;
+
       pack.rawBuffer = appendBytes(pack.rawBuffer, chunk);
+      const buf = pack.rawBuffer;
 
-      // Quét tìm Magic Header 0x4E 0x57 ("NW")
-      let buf = pack.rawBuffer;
-      let headerIdx = -1;
+      // Quét tìm Tag 0x79 (Cell info) trong toàn bộ buffer
+      let foundTag79 = false;
+      for (let i = 0; i < buf.length - 10; i++) {
+        // Tag 0x79 theo sau là độ dài dataLen (45 bytes cho 15 cell)
+        if (buf[i] === 0x79) {
+          const dataLen = buf[i + 1];
+          // Đối với pack 15S, dataLen thường là 45 bytes (15 * 3) hoặc 48 bytes (16 * 3)
+          if (dataLen >= 45 && dataLen <= 72 && (i + 2 + dataLen <= buf.length)) {
+            const cellCount = Math.floor(dataLen / 3);
+            let cells = [];
+            let ptr = i + 2;
 
-      for (let i = 0; i < buf.length - 1; i++) {
-        if (buf[i] === 0x4E && buf[i + 1] === 0x57) {
-          headerIdx = i;
-          break;
-        }
-      }
-
-      if (headerIdx === -1) {
-        if (buf.length > 512) pack.rawBuffer = new Uint8Array(0);
-        return;
-      }
-
-      if (headerIdx > 0) {
-        buf = buf.slice(headerIdx);
-        pack.rawBuffer = buf;
-      }
-
-      if (buf.length < 4) return;
-      const frameLen = (buf[2] << 8) | buf[3];
-      const totalExpected = frameLen + 4;
-
-      if (buf.length < totalExpected) {
-        return; // Chờ nhận thêm các gói chunk tiếp theo
-      }
-
-      // Đã nhận trọn vẹn 1 khung frame chuẩn
-      const frame = buf.slice(0, totalExpected);
-      pack.rawBuffer = buf.slice(totalExpected);
-
-      parseJkFrame(packIndex, frame);
-    }
-
-    function parseJkFrame(packIndex, frame) {
-      const pack = bmsPacks[packIndex];
-      let ptr = 4; // Bỏ qua 0x4E 0x57 và 2 byte Length
-      
-      // Bỏ qua header phụ (Terminal ID, Frame Counter)
-      if (ptr + 8 < frame.length) ptr += 8;
-
-      let extractedCells = [];
-      let totalV = 0;
-      let currentA = 0;
-      let socVal = 0;
-      let tempVal = 30;
-
-      while (ptr < frame.length - 4) {
-        const tag = frame[ptr];
-        ptr++;
-
-        if (tag === 0x79) {
-          // TAG 0x79: Dữ liệu Cell
-          const dataLen = frame[ptr];
-          ptr++;
-          const cellCount = Math.floor(dataLen / 3);
-
-          extractedCells = [];
-          for (let c = 0; c < cellCount; c++) {
-            const cellId = frame[ptr];
-            const v_mV = (frame[ptr + 1] << 8) | frame[ptr + 2];
-            const volt = Number((v_mV / 1000).toFixed(3));
-            if (volt > 2.0 && volt < 4.5) {
-              extractedCells.push(volt);
+            for (let c = 0; c < cellCount; c++) {
+              const v_mV = (buf[ptr + 1] << 8) | buf[ptr + 2];
+              const volt = Number((v_mV / 1000).toFixed(3));
+              if (volt >= 2.0 && volt <= 4.5) {
+                cells.push(volt);
+              }
+              ptr += 3;
             }
-            ptr += 3;
+
+            if (cells.length >= 14) {
+              pack.cells = cells.slice(0, 15);
+              foundTag79 = true;
+              break;
+            }
           }
-        } else if (tag === 0x80) {
-          // Temp 1 (Power MOS)
-          tempVal = frame[ptr] > 100 ? -(frame[ptr] - 100) : frame[ptr];
-          ptr++;
-        } else if (tag === 0x81 || tag === 0x82) {
-          ptr++;
-        } else if (tag === 0x83) {
-          // Tổng điện áp pack (uint16 * 0.01V)
-          totalV = ((frame[ptr] << 8) | frame[ptr + 1]) * 0.01;
-          ptr += 2;
-        } else if (tag === 0x84) {
-          // Dòng điện pack (uint16 * 0.01A)
-          let rawI = (frame[ptr] << 8) | frame[ptr + 1];
-          if (rawI & 0x8000) {
-            currentA = -((rawI & 0x7FFF) * 0.01);
-          } else {
-            currentA = rawI * 0.01;
-          }
-          ptr += 2;
-        } else if (tag === 0x85) {
-          // SOC (%)
-          socVal = frame[ptr];
-          ptr++;
-        } else {
-          // Các tag cấu hình khác
-          ptr++;
         }
       }
 
-      if (extractedCells.length > 0) {
-        pack.cells = extractedCells.slice(0, 15); // Lấy chuẩn 15 cell cho hệ 15S
-        pack.voltage = totalV > 30 ? totalV : pack.cells.reduce((a, b) => a + b, 0);
-        pack.current = currentA;
-        pack.soc = socVal > 0 ? socVal : pack.soc;
-        pack.temp = tempVal;
+      // Quét các thông số tổng áp (Tag 0x83), Dòng điện (Tag 0x84), SOC (Tag 0x85)
+      for (let i = 0; i < buf.length - 3; i++) {
+        if (buf[i] === 0x83) {
+          const v = ((buf[i + 1] << 8) | buf[i + 2]) * 0.01;
+          if (v > 35 && v < 65) {
+            pack.voltage = Number(v.toFixed(2));
+          }
+        }
+        if (buf[i] === 0x84) {
+          let rawI = (buf[i + 1] << 8) | buf[i + 2];
+          if (rawI & 0x8000) {
+            pack.current = Number((-((rawI & 0x7FFF) * 0.01)).toFixed(2));
+          } else {
+            pack.current = Number((rawI * 0.01).toFixed(2));
+          }
+        }
+        if (buf[i] === 0x85) {
+          const s = buf[i + 1];
+          if (s >= 0 && s <= 100) {
+            pack.soc = s;
+          }
+        }
+        if (buf[i] === 0x80) {
+          const t = buf[i + 1];
+          pack.temp = t > 100 ? -(t - 100) : t;
+        }
+      }
+
+      // Nếu đã có cell thì tính tổng áp từ cell nếu tag 0x83 chưa xuất hiện
+      if (pack.cells.length > 0) {
+        if (pack.voltage < 35) {
+          pack.voltage = Number(pack.cells.reduce((a, b) => a + b, 0).toFixed(2));
+        }
         updateSystemTotals();
+      }
+
+      // Duy trì buffer cuộn gọn (giữ lại 128 bytes gần nhất)
+      if (buf.length > 384) {
+        pack.rawBuffer = buf.slice(buf.length - 128);
       }
     }
 
@@ -1084,10 +1085,16 @@
       const sub = document.getElementById(`pack${index + 1}Sub`);
 
       if (pack.connected) {
+        if (pack.queryTimer) {
+          clearInterval(pack.queryTimer);
+          pack.queryTimer = null;
+        }
         if (isCapacitor && BleClient && pack.deviceId) {
           try { await BleClient.disconnect({ deviceId: pack.deviceId }); } catch (e) {}
         }
         pack.connected = false;
+        pack.bytesReceived = 0;
+        pack.rawBuffer = new Uint8Array(0);
         btn.textContent = 'Kết nối BLE';
         btn.classList.remove('connected');
         sub.textContent = 'Đã ngắt kết nối';
@@ -1119,10 +1126,21 @@
 
           pack.deviceId = targetId;
           pack.connected = true;
+          pack.bytesReceived = 0;
+          pack.rawBuffer = new Uint8Array(0);
           btn.textContent = 'Ngắt kết nối';
           btn.classList.add('connected');
-          sub.textContent = `Đã kết nối: ${device.name || 'JK-BMS'}`;
-          showToast(`Đã kết nối ${pack.name}!`);
+          sub.textContent = `Đang kích hoạt ${device.name || 'JK-BMS'}...`;
+          showToast(`Đã kết nối ${pack.name}, đang gửi lệnh đọc...`);
+
+          // Gửi lệnh truy vấn kích hoạt dữ liệu ngay lập tức
+          setTimeout(() => { sendQueryCommand(index); }, 400);
+
+          // Định kỳ phát lệnh truy vấn mỗi 1.2s để nhận dữ liệu thời gian thực
+          if (pack.queryTimer) clearInterval(pack.queryTimer);
+          pack.queryTimer = setInterval(() => {
+            sendQueryCommand(index);
+          }, 1200);
 
         } else if (navigator.bluetooth) {
           const device = await navigator.bluetooth.requestDevice({
