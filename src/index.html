@@ -6,17 +6,18 @@
   <title>T71-BMS Monitor | Tailg T71 96V 30S</title>
   <style>
     :root {
-      --bg: #060913;
-      --card-bg: #0d1322;
-      --card-border: #1a233a;
+      --bg: #070b14;
+      --card-bg: #111827;
+      --card-border: #1f293d;
       --primary: #00f2fe;
       --primary-gradient: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
       --accent-green: #10b981;
       --accent-orange: #f59e0b;
       --accent-red: #ef4444;
-      --accent-blue: #38bdf8;
+      --accent-purple: #8b5cf6;
       --text-main: #f8fafc;
-      --text-muted: #8492a6;
+      --text-muted: #94a3b8;
+      --navbar-bg: rgba(15, 23, 42, 0.95);
       --font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
     }
 
@@ -32,657 +33,791 @@
       color: var(--text-main);
       font-family: var(--font-family);
       min-height: 100vh;
-      /* Padding đỉnh máy để né camera đục lỗ / notch tai thỏ của điện thoại */
-      padding-top: max(env(safe-area-inset-top), 38px);
-      padding-bottom: max(env(safe-area-inset-bottom), 30px);
-      padding-left: 12px;
-      padding-right: 12px;
+      padding-bottom: 75px; /* Chừa chỗ cho Bottom Navbar */
+      overflow-x: hidden;
     }
 
-    /* Top Bar Mobile */
-    .top-bar {
+    /* Header Bar */
+    .header {
+      background: rgba(17, 24, 39, 0.85);
+      backdrop-filter: blur(12px);
+      border-bottom: 1px solid var(--card-border);
+      padding: 12px 16px;
+      position: sticky;
+      top: 0;
+      z-index: 100;
       display: flex;
       justify-content: space-between;
       align-items: center;
-      padding: 8px 4px 14px;
     }
 
-    .app-brand {
+    .brand {
       display: flex;
       align-items: center;
       gap: 10px;
     }
 
-    .app-logo {
-      width: 36px;
-      height: 36px;
+    .brand-icon {
+      width: 34px;
+      height: 34px;
       background: var(--primary-gradient);
-      border-radius: 10px;
+      border-radius: 9px;
       display: flex;
       align-items: center;
       justify-content: center;
       font-weight: 900;
-      font-size: 14px;
       color: #070b14;
-      box-shadow: 0 0 15px rgba(0, 242, 254, 0.35);
+      font-size: 14px;
+      box-shadow: 0 0 12px rgba(0, 242, 254, 0.35);
     }
 
-    .app-title {
-      font-size: 16px;
-      font-weight: 800;
+    .brand-title {
+      font-size: 15px;
+      font-weight: 700;
       letter-spacing: 0.5px;
-      line-height: 1.2;
     }
 
-    .app-subtitle {
+    .brand-subtitle {
       font-size: 11px;
       color: var(--primary);
-      font-weight: 600;
     }
 
-    .top-tools {
+    .top-actions {
       display: flex;
-      gap: 6px;
+      align-items: center;
+      gap: 8px;
     }
 
-    .badge-btn {
-      background: #151d30;
+    .btn-badge {
+      background: #1e293b;
       border: 1px solid var(--card-border);
       color: var(--text-muted);
       font-size: 11px;
-      padding: 5px 9px;
-      border-radius: 14px;
-      font-weight: 600;
+      padding: 5px 10px;
+      border-radius: 20px;
       cursor: pointer;
       display: flex;
       align-items: center;
       gap: 5px;
+      font-weight: 500;
       transition: all 0.2s;
     }
 
-    .badge-btn.active {
+    .btn-badge.active {
       background: rgba(16, 185, 129, 0.15);
       border-color: var(--accent-green);
       color: var(--accent-green);
     }
 
-    .dot-status {
-      width: 6px;
-      height: 6px;
+    .status-dot {
+      width: 7px;
+      height: 7px;
       border-radius: 50%;
       background: var(--text-muted);
     }
 
-    .dot-status.green {
+    .status-dot.online {
       background: var(--accent-green);
       box-shadow: 0 0 8px var(--accent-green);
     }
 
-    /* Mobile Dashboard Container */
-    .dashboard-container {
-      max-width: 500px;
+    /* Container & Tab Panels */
+    .container {
+      max-width: 640px;
       margin: 0 auto;
-      display: flex;
-      flex-direction: column;
-      gap: 12px;
+      padding: 14px;
     }
 
-    /* Glass Card */
-    .ui-card {
+    .tab-pane {
+      display: none;
+      flex-direction: column;
+      gap: 12px;
+      animation: fadeIn 0.25s ease-out;
+    }
+
+    .tab-pane.active {
+      display: flex;
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(6px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    /* Card Box */
+    .card {
       background: var(--card-bg);
       border: 1px solid var(--card-border);
-      border-radius: 18px;
-      padding: 14px;
+      border-radius: 16px;
+      padding: 16px;
       position: relative;
     }
 
-    /* Primary HUD Card */
-    .hud-hero {
-      background: linear-gradient(180deg, #10192e 0%, #0a0f1d 100%);
-      border: 1px solid #1f2c48;
-      box-shadow: 0 10px 25px rgba(0, 0, 0, 0.4);
+    /* TAB 1: HUD DASHBOARD */
+    .hud-main {
+      background: linear-gradient(180deg, #131d31 0%, #0c1220 100%);
+      border: 1px solid #223254;
       text-align: center;
-      padding: 16px 14px;
+      padding: 22px 16px;
     }
 
-    .hud-meta-row {
+    .hud-top-row {
       display: flex;
       justify-content: space-between;
       align-items: center;
-      margin-bottom: 8px;
+      margin-bottom: 12px;
     }
 
-    .tag-vehicle {
+    .tag-profile {
       background: rgba(0, 242, 254, 0.12);
       color: var(--primary);
-      border: 1px solid rgba(0, 242, 254, 0.25);
-      padding: 3px 8px;
+      border: 1px solid rgba(0, 242, 254, 0.3);
+      padding: 4px 10px;
       border-radius: 6px;
       font-size: 11px;
       font-weight: 700;
-      letter-spacing: 0.3px;
     }
 
-    .soc-badge {
-      font-size: 13px;
-      font-weight: 800;
-      color: var(--accent-green);
+    .battery-soc-pill {
       display: flex;
       align-items: center;
-      gap: 4px;
-    }
-
-    .hud-voltage-val {
-      font-size: 56px;
-      font-weight: 900;
-      line-height: 1.05;
-      color: #ffffff;
-      text-shadow: 0 0 25px rgba(0, 242, 254, 0.25);
-      margin: 4px 0 10px;
-      font-variant-numeric: tabular-nums;
-    }
-
-    .hud-voltage-val small {
-      font-size: 20px;
-      color: var(--primary);
+      gap: 6px;
+      font-size: 14px;
       font-weight: 700;
+      color: var(--accent-green);
+    }
+
+    .main-voltage {
+      font-size: 58px;
+      font-weight: 800;
+      line-height: 1;
+      color: #ffffff;
+      text-shadow: 0 0 24px rgba(0, 242, 254, 0.3);
+      margin: 10px 0;
+    }
+
+    .main-voltage small {
+      font-size: 22px;
+      color: var(--primary);
+      font-weight: 600;
       margin-left: 2px;
     }
 
-    /* Battery progress bar */
-    .battery-track {
+    .battery-bar-container {
       width: 100%;
-      height: 7px;
-      background: #1a2338;
-      border-radius: 4px;
+      height: 10px;
+      background: #1e293b;
+      border-radius: 6px;
+      margin: 14px 0 18px;
       overflow: hidden;
-      margin-bottom: 14px;
+      position: relative;
     }
 
-    .battery-fill {
+    .battery-bar-fill {
       height: 100%;
       width: 0%;
       background: var(--primary-gradient);
-      border-radius: 4px;
-      transition: width 0.35s ease;
+      border-radius: 6px;
+      transition: width 0.4s ease;
     }
 
-    /* 3 Main Gauges */
-    .hud-gauges-grid {
+    .hud-grid {
       display: grid;
       grid-template-columns: repeat(3, 1fr);
-      gap: 8px;
-    }
-
-    .gauge-pill {
-      background: rgba(13, 20, 36, 0.8);
-      border: 1px solid rgba(255, 255, 255, 0.05);
-      border-radius: 12px;
-      padding: 8px 4px;
-    }
-
-    .gauge-label {
-      font-size: 10px;
-      color: var(--text-muted);
-      font-weight: 600;
-      margin-bottom: 2px;
-    }
-
-    .gauge-value {
-      font-size: 16px;
-      font-weight: 800;
-      color: #fff;
-      font-variant-numeric: tabular-nums;
-    }
-
-    .gauge-value.green { color: var(--accent-green); }
-    .gauge-value.cyan { color: var(--primary); }
-    .gauge-value.orange { color: var(--accent-orange); }
-
-    /* Dual BMS Connection Cards */
-    .pack-selector-list {
-      display: flex;
-      flex-direction: column;
-      gap: 8px;
-    }
-
-    .pack-card-item {
-      background: #090e1a;
-      border: 1px solid var(--card-border);
-      border-radius: 14px;
-      padding: 10px 12px;
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-    }
-
-    .pack-item-left {
-      display: flex;
-      align-items: center;
       gap: 10px;
     }
 
-    .pack-icon-box {
-      width: 32px;
-      height: 32px;
-      background: #151d30;
-      border-radius: 8px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-size: 14px;
+    .metric-box {
+      background: rgba(15, 23, 42, 0.7);
+      border: 1px solid rgba(255, 255, 255, 0.05);
+      border-radius: 12px;
+      padding: 10px 8px;
+      text-align: center;
     }
 
-    .pack-title {
-      font-size: 13px;
-      font-weight: 700;
-    }
-
-    .pack-desc {
+    .metric-label {
       font-size: 11px;
       color: var(--text-muted);
+      margin-bottom: 4px;
     }
 
-    .btn-action-connect {
-      background: var(--primary-gradient);
-      color: #070b14;
-      font-weight: 800;
-      font-size: 12px;
-      border: none;
-      border-radius: 10px;
-      padding: 8px 14px;
-      cursor: pointer;
+    .metric-value {
+      font-size: 17px;
+      font-weight: 700;
+      color: #fff;
+    }
+
+    .metric-value.green { color: var(--accent-green); }
+    .metric-value.orange { color: var(--accent-orange); }
+    .metric-value.cyan { color: var(--primary); }
+
+    .pack-sub-status {
       display: flex;
-      align-items: center;
-      gap: 5px;
-      box-shadow: 0 4px 10px rgba(0, 242, 254, 0.2);
+      justify-content: space-between;
+      margin-top: 14px;
+      padding-top: 12px;
+      border-top: 1px solid rgba(255, 255, 255, 0.07);
+      font-size: 12px;
     }
 
-    .btn-action-connect.connected {
-      background: #182236;
-      color: var(--accent-red);
-      border: 1px solid rgba(239, 68, 68, 0.35);
-      box-shadow: none;
-    }
-
-    /* Cell Matrix - 5 Cột cực kỳ chuẩn trên điện thoại */
-    .card-header-row {
+    /* TAB 2: CELL MATRIX */
+    .section-title {
+      font-size: 14px;
+      font-weight: 700;
+      margin-bottom: 12px;
       display: flex;
       justify-content: space-between;
       align-items: center;
-      margin-bottom: 10px;
     }
 
-    .card-heading {
-      font-size: 13px;
-      font-weight: 800;
-      letter-spacing: 0.3px;
-    }
-
-    .delta-v-badge {
-      font-size: 11px;
-      font-weight: 700;
-      padding: 2px 7px;
+    .delta-badge {
+      font-size: 12px;
+      padding: 4px 10px;
       border-radius: 6px;
-      background: rgba(245, 158, 11, 0.12);
-      color: var(--accent-orange);
+      background: rgba(245, 158, 11, 0.15);
       border: 1px solid rgba(245, 158, 11, 0.3);
+      color: var(--accent-orange);
+      font-weight: 700;
     }
 
-    .delta-v-badge.good {
-      background: rgba(16, 185, 129, 0.12);
-      color: var(--accent-green);
+    .delta-badge.good {
+      background: rgba(16, 185, 129, 0.15);
       border-color: rgba(16, 185, 129, 0.3);
+      color: var(--accent-green);
     }
 
-    .pack-divider-label {
-      font-size: 10px;
+    .pack-cell-header {
+      font-size: 12px;
       font-weight: 700;
       color: var(--primary);
-      margin: 8px 0 4px;
+      margin: 10px 0 6px;
       display: flex;
       justify-content: space-between;
     }
 
-    .cell-grid-5cols {
+    .cell-grid {
       display: grid;
       grid-template-columns: repeat(5, 1fr);
-      gap: 5px;
+      gap: 6px;
     }
 
-    .cell-box {
-      background: #090e1a;
+    .cell-item {
+      background: #0f172a;
       border: 1px solid var(--card-border);
       border-radius: 8px;
-      padding: 6px 2px;
+      padding: 8px 4px;
       text-align: center;
+      position: relative;
       transition: all 0.2s;
     }
 
-    .cell-box.max {
+    .cell-item.max {
       border-color: var(--accent-green);
       background: rgba(16, 185, 129, 0.12);
     }
 
-    .cell-box.min {
+    .cell-item.min {
       border-color: var(--accent-red);
       background: rgba(239, 68, 68, 0.12);
     }
 
-    .cell-idx {
-      font-size: 9px;
+    .cell-num {
+      font-size: 10px;
       color: var(--text-muted);
-      font-weight: 600;
+      margin-bottom: 2px;
     }
 
-    .cell-val {
+    .cell-volt {
       font-size: 12px;
-      font-weight: 800;
+      font-weight: 700;
       color: #fff;
-      font-variant-numeric: tabular-nums;
-      margin-top: 1px;
     }
 
-    /* Switch Controls Grid */
-    .switches-row {
-      display: grid;
-      grid-template-columns: repeat(3, 1fr);
-      gap: 8px;
+    /* TAB 3: CONTROLS & BLE */
+    .bms-pack-list {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
     }
 
-    .switch-card {
-      background: #090e1a;
+    .pack-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      background: #0f172a;
       border: 1px solid var(--card-border);
       border-radius: 12px;
-      padding: 10px 4px;
+      padding: 12px;
+    }
+
+    .pack-info {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .pack-icon {
+      width: 36px;
+      height: 36px;
+      background: #1e293b;
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 16px;
+    }
+
+    .pack-name {
+      font-size: 13px;
+      font-weight: 700;
+    }
+
+    .pack-sub {
+      font-size: 11px;
+      color: var(--text-muted);
+    }
+
+    .btn-connect {
+      background: var(--primary-gradient);
+      color: #070b14;
+      font-weight: 700;
+      font-size: 12px;
+      border: none;
+      border-radius: 8px;
+      padding: 8px 14px;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+    }
+
+    .btn-connect.connected {
+      background: #1e293b;
+      color: var(--accent-red);
+      border: 1px solid rgba(239, 68, 68, 0.4);
+    }
+
+    .switch-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 10px;
+      margin-top: 6px;
+    }
+
+    .control-card {
+      background: #0f172a;
+      border: 1px solid var(--card-border);
+      border-radius: 12px;
+      padding: 14px 8px;
+      text-align: center;
       display: flex;
       flex-direction: column;
       align-items: center;
-      gap: 6px;
+      gap: 10px;
     }
 
-    .switch-title {
+    .control-name {
       font-size: 11px;
       font-weight: 700;
       color: var(--text-muted);
     }
 
-    /* iOS/Android style toggle switch */
-    .toggle-wrap {
+    .switch {
       position: relative;
       display: inline-block;
-      width: 42px;
-      height: 22px;
+      width: 46px;
+      height: 26px;
     }
 
-    .toggle-wrap input { opacity: 0; width: 0; height: 0; }
+    .switch input { opacity: 0; width: 0; height: 0; }
 
-    .toggle-slider {
+    .slider {
       position: absolute;
       cursor: pointer;
       top: 0; left: 0; right: 0; bottom: 0;
-      background-color: #242f48;
-      transition: .25s;
-      border-radius: 22px;
+      background-color: #334155;
+      transition: .3s;
+      border-radius: 26px;
     }
 
-    .toggle-slider:before {
+    .slider:before {
       position: absolute;
       content: "";
-      height: 16px;
-      width: 16px;
+      height: 20px;
+      width: 20px;
       left: 3px;
       bottom: 3px;
       background-color: white;
-      transition: .25s;
+      transition: .3s;
       border-radius: 50%;
     }
 
-    input:checked + .toggle-slider { background: var(--accent-green); }
-    input:checked + .toggle-slider:before { transform: translateX(20px); }
+    input:checked + .slider { background: var(--accent-green); }
+    input:checked + .slider:before { transform: translateX(20px); }
 
-    /* Diagnostic Console / Log Box */
-    .console-box {
-      background: #05070d;
-      border: 1px solid #141b2c;
-      border-radius: 10px;
-      padding: 8px 10px;
-      font-family: monospace;
-      font-size: 10px;
-      color: #64748b;
-      max-height: 80px;
-      overflow-y: auto;
-      line-height: 1.4;
+    /* TAB 4: HISTORY & GOOGLE SHEETS */
+    .sync-actions {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
     }
 
-    .console-box .active-log {
+    .btn-action-large {
+      background: #1e293b;
+      border: 1px solid var(--card-border);
+      color: #fff;
+      border-radius: 12px;
+      padding: 12px 16px;
+      font-size: 13px;
+      font-weight: 700;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .btn-action-large.primary {
+      background: rgba(0, 242, 254, 0.15);
+      border-color: var(--primary);
       color: var(--primary);
     }
 
-    /* Toast */
-    .toast-popup {
+    .stat-row {
+      display: flex;
+      justify-content: space-between;
+      padding: 10px 0;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+      font-size: 13px;
+    }
+
+    .stat-row:last-child { border-bottom: none; }
+
+    /* BOTTOM NAVIGATION BAR */
+    .bottom-navbar {
       position: fixed;
-      bottom: 24px;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      height: 64px;
+      background: var(--navbar-bg);
+      backdrop-filter: blur(16px);
+      border-top: 1px solid var(--card-border);
+      display: flex;
+      justify-content: space-around;
+      align-items: center;
+      z-index: 200;
+      padding-bottom: env(safe-area-inset-bottom);
+    }
+
+    .nav-item {
+      flex: 1;
+      height: 100%;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 4px;
+      color: var(--text-muted);
+      cursor: pointer;
+      transition: all 0.2s;
+      border: none;
+      background: transparent;
+    }
+
+    .nav-item.active {
+      color: var(--primary);
+    }
+
+    .nav-icon {
+      font-size: 18px;
+    }
+
+    .nav-label {
+      font-size: 10px;
+      font-weight: 600;
+    }
+
+    /* Toast */
+    .toast {
+      position: fixed;
+      bottom: 76px;
       left: 50%;
       transform: translateX(-50%);
-      background: rgba(13, 19, 34, 0.96);
+      background: rgba(15, 23, 42, 0.95);
       border: 1px solid var(--primary);
       color: #fff;
-      padding: 9px 18px;
+      padding: 10px 18px;
       border-radius: 20px;
       font-size: 12px;
-      font-weight: 600;
-      box-shadow: 0 10px 25px rgba(0,0,0,0.6);
+      box-shadow: 0 10px 25px rgba(0,0,0,0.5);
       z-index: 1000;
       display: none;
-      white-space: nowrap;
     }
   </style>
 </head>
 <body>
 
-  <!-- Top Navigation Bar -->
-  <div class="top-bar">
-    <div class="app-brand">
-      <div class="app-logo">T71</div>
+  <!-- Top Header -->
+  <header class="header">
+    <div class="brand">
+      <div class="brand-icon">T71</div>
       <div>
-        <div class="app-title">T71-BMS</div>
-        <div class="app-subtitle">96V 30S LiFePO4</div>
+        <div class="brand-title">T71-BMS MONITOR</div>
+        <div class="brand-subtitle">Tailg 96V 30S LiFePO4</div>
       </div>
     </div>
-    <div class="top-tools">
-      <button class="badge-btn" id="btnSim" onclick="toggleSimulation()">
-        <span class="dot-status" id="dotSim"></span> Giả lập
+    <div class="top-actions">
+      <button id="simBtn" class="btn-badge" onclick="toggleSimulation()">
+        <span class="status-dot" id="simDot"></span> Giả lập
       </button>
-      <button class="badge-btn" id="btnSheets" onclick="triggerManualLog()">
-        <span class="dot-status green"></span> Sheets
+      <button id="cloudStatus" class="btn-badge" onclick="triggerManualLog()">
+        <span class="status-dot online"></span> Sheets
       </button>
     </div>
+  </header>
+
+  <div class="container">
+
+    <!-- ==================== TAB 1: HUD DASHBOARD ==================== -->
+    <div class="tab-pane active" id="pane-hud">
+      <div class="card hud-main">
+        <div class="hud-top-row">
+          <span class="tag-profile">TAILG T71 (96V 30S)</span>
+          <div class="battery-soc-pill">
+            <span>⚡ SOC:</span>
+            <span id="socVal">-- %</span>
+          </div>
+        </div>
+
+        <div class="main-voltage" id="totalVoltage">--.-<small>V</small></div>
+
+        <div class="battery-bar-container">
+          <div class="battery-bar-fill" id="socBar"></div>
+        </div>
+
+        <div class="hud-grid">
+          <div class="metric-box">
+            <div class="metric-label">Dòng điện</div>
+            <div class="metric-value green" id="currentVal">0.00 A</div>
+          </div>
+          <div class="metric-box">
+            <div class="metric-label">Công suất</div>
+            <div class="metric-value cyan" id="powerVal">0 W</div>
+          </div>
+          <div class="metric-box">
+            <div class="metric-label">Nhiệt độ TB</div>
+            <div class="metric-value orange" id="tempVal">-- °C</div>
+          </div>
+        </div>
+
+        <div class="pack-sub-status">
+          <span id="p1Summary">Khối 1 (T71P1): --.-V</span>
+          <span id="p2Summary">Khối 2 (T71P2): --.-V</span>
+        </div>
+      </div>
+
+      <!-- Quick Status Card -->
+      <div class="card">
+        <div class="section-title">
+          <span>TỔNG QUAN HỆ THỐNG</span>
+          <span class="delta-badge" id="hudDeltaBadge">ΔV: -- mV</span>
+        </div>
+        <div class="stat-row">
+          <span style="color: var(--text-muted);">Cell cao nhất:</span>
+          <span id="hudMaxCell" style="font-weight: 700; color: var(--accent-green);">-.--- V</span>
+        </div>
+        <div class="stat-row">
+          <span style="color: var(--text-muted);">Cell thấp nhất:</span>
+          <span id="hudMinCell" style="font-weight: 700; color: var(--accent-red);">-.--- V</span>
+        </div>
+        <div class="stat-row">
+          <span style="color: var(--text-muted);">Dung lượng còn lại:</span>
+          <span id="hudRemainingAh" style="font-weight: 700;">-- / 45.0 Ah</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- ==================== TAB 2: MA TRẬN 30 CELL ==================== -->
+    <div class="tab-pane" id="pane-cells">
+      <div class="card">
+        <div class="section-title">
+          <span>CHI TIẾT 30 CELL NỐI TIẾP</span>
+          <span class="delta-badge" id="deltaBadge">ΔV: -- mV</span>
+        </div>
+
+        <!-- Khối 1: Cell 1 - 15 -->
+        <div class="pack-cell-header">
+          <span>KHỐI 1 (T71P1: C1 - C15)</span>
+          <span id="p1CellTotal">--.-V</span>
+        </div>
+        <div class="cell-grid" id="gridPack1"></div>
+
+        <!-- Khối 2: Cell 16 - 30 -->
+        <div class="pack-cell-header" style="margin-top: 16px;">
+          <span>KHỐI 2 (T71P2: C16 - C30)</span>
+          <span id="p2CellTotal">--.-V</span>
+        </div>
+        <div class="cell-grid" id="gridPack2"></div>
+      </div>
+    </div>
+
+    <!-- ==================== TAB 3: ĐIỀU KHIỂN & BLUETOOTH ==================== -->
+    <div class="tab-pane" id="pane-controls">
+      <div class="card">
+        <div class="section-title">
+          <span>KẾT NỐI JK-BMS BLUETOOTH</span>
+          <span style="font-size: 11px; color: var(--text-muted);">2 Khối song song</span>
+        </div>
+
+        <div class="bms-pack-list">
+          <div class="pack-row">
+            <div class="pack-info">
+              <div class="pack-icon">🔋</div>
+              <div>
+                <div class="pack-name" id="pack1Name">Khối 1: T71P1 (15S)</div>
+                <div class="pack-sub" id="pack1Sub">Chưa kết nối</div>
+              </div>
+            </div>
+            <button class="btn-connect" id="btnPack1" onclick="connectPack(0)">Kết nối BLE</button>
+          </div>
+
+          <div class="pack-row">
+            <div class="pack-info">
+              <div class="pack-icon">🔋</div>
+              <div>
+                <div class="pack-name" id="pack2Name">Khối 2: T71P2 (15S)</div>
+                <div class="pack-sub" id="pack2Sub">Chưa kết nối</div>
+              </div>
+            </div>
+            <button class="btn-connect" id="btnPack2" onclick="connectPack(1)">Kết nối BLE</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="section-title">
+          <span>CÔNG TẮC BẢO VỆ MOSFET</span>
+          <span style="font-size: 11px; color: var(--text-muted);">An toàn nguồn điện</span>
+        </div>
+
+        <div class="switch-grid">
+          <div class="control-card">
+            <span class="control-name">MOS SẠC</span>
+            <label class="switch">
+              <input type="checkbox" id="chargeSwitch" checked onchange="toggleMosfet('charge', this.checked)">
+              <span class="slider"></span>
+            </label>
+          </div>
+          <div class="control-card">
+            <span class="control-name">MOS XẢ</span>
+            <label class="switch">
+              <input type="checkbox" id="dischargeSwitch" checked onchange="toggleMosfet('discharge', this.checked)">
+              <span class="slider"></span>
+            </label>
+          </div>
+          <div class="control-card">
+            <span class="control-name">CÂN BẰNG</span>
+            <label class="switch">
+              <input type="checkbox" id="balanceSwitch" checked onchange="toggleMosfet('balance', this.checked)">
+              <span class="slider"></span>
+            </label>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ==================== TAB 4: NHẬT KÝ & SHEETS ==================== -->
+    <div class="tab-pane" id="pane-history">
+      <div class="card">
+        <div class="section-title">
+          <span>ĐỒNG BỘ GOOGLE SHEETS</span>
+          <span style="font-size: 11px; color: var(--accent-green);" id="syncIndicator">● Sẵn sàng</span>
+        </div>
+
+        <div class="sync-actions">
+          <button class="btn-action-large primary" onclick="triggerManualLog()">
+            <span>📝 Ghi Mốc Nhật Ký Ngay</span>
+            <span>Gửi Sheets ➔</span>
+          </button>
+          <button class="btn-action-large" onclick="finishTrip()">
+            <span>🏁 Kết Thúc Chuyến Đi (Trip Summary)</span>
+            <span>Tổng kết ➔</span>
+          </button>
+        </div>
+
+        <div style="margin-top: 14px; font-size: 12px; color: var(--text-muted);">
+          <div class="stat-row">
+            <span>Trạng thái gửi:</span>
+            <span id="lastSyncText">Chưa gửi</span>
+          </div>
+          <div class="stat-row">
+            <span>Chu kỳ tự động:</span>
+            <span>Mỗi 45 giây</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
   </div>
 
-  <div class="dashboard-container">
+  <!-- Bottom Navigation Bar -->
+  <nav class="bottom-navbar">
+    <button class="nav-item active" onclick="switchTab('hud', this)">
+      <div class="nav-icon">🏎️</div>
+      <div class="nav-label">HUD Lái Xe</div>
+    </button>
+    <button class="nav-item" onclick="switchTab('cells', this)">
+      <div class="nav-icon">📊</div>
+      <div class="nav-label">30 Cell</div>
+    </button>
+    <button class="nav-item" onclick="switchTab('controls', this)">
+      <div class="nav-icon">⚙️</div>
+      <div class="nav-label">Điều Khiển</div>
+    </button>
+    <button class="nav-item" onclick="switchTab('history', this)">
+      <div class="nav-icon">☁️</div>
+      <div class="nav-label">Nhật Ký</div>
+    </button>
+  </nav>
 
-    <!-- HUD Hero Dashboard -->
-    <div class="ui-card hud-hero">
-      <div class="hud-meta-row">
-        <span class="tag-vehicle">TAILG T71 • HỆ PIN SẮT 30S</span>
-        <div class="soc-badge">
-          <span>⚡ SOC:</span>
-          <span id="hudSoc">-- %</span>
-        </div>
-      </div>
-
-      <div class="hud-voltage-val" id="hudTotalVoltage">--.-<small>V</small></div>
-
-      <div class="battery-track">
-        <div class="battery-fill" id="hudSocBar"></div>
-      </div>
-
-      <div class="hud-gauges-grid">
-        <div class="gauge-pill">
-          <div class="gauge-label">DÒNG ĐIỆN</div>
-          <div class="gauge-value green" id="hudCurrent">0.00 A</div>
-        </div>
-        <div class="gauge-pill">
-          <div class="gauge-label">CÔNG SUẤT</div>
-          <div class="gauge-value cyan" id="hudPower">0 W</div>
-        </div>
-        <div class="gauge-pill">
-          <div class="gauge-label">NHIỆT ĐỘ TB</div>
-          <div class="gauge-value orange" id="hudTemp">-- °C</div>
-        </div>
-      </div>
-    </div>
-
-    <!-- Dual BMS Connection Section -->
-    <div class="ui-card">
-      <div class="card-header-row">
-        <span class="card-heading">KẾT NỐI JK-BMS BLUETOOTH</span>
-        <span style="font-size: 10px; color: var(--text-muted);" id="bleStatusLabel">BLE 2 Khối</span>
-      </div>
-
-      <div class="pack-selector-list">
-        <!-- Khối 1: T71P1 -->
-        <div class="pack-card-item">
-          <div class="pack-item-left">
-            <div class="pack-icon-box">🔋</div>
-            <div>
-              <div class="pack-title" id="p1Title">Khối 1 (15S): T71P1</div>
-              <div class="pack-desc" id="p1Sub">Chưa kết nối</div>
-            </div>
-          </div>
-          <button class="btn-action-connect" id="btnConnect1" onclick="connectPack(0)">Kết nối</button>
-        </div>
-
-        <!-- Khối 2: T71P2 -->
-        <div class="pack-card-item">
-          <div class="pack-item-left">
-            <div class="pack-icon-box">🔋</div>
-            <div>
-              <div class="pack-title" id="p2Title">Khối 2 (15S): T71P2</div>
-              <div class="pack-desc" id="p2Sub">Chưa kết nối</div>
-            </div>
-          </div>
-          <button class="btn-action-connect" id="btnConnect2" onclick="connectPack(1)">Kết nối</button>
-        </div>
-      </div>
-    </div>
-
-    <!-- Cell Matrix Section (5 Cột x 6 Hàng) -->
-    <div class="ui-card">
-      <div class="card-header-row">
-        <span class="card-heading">MA TRẬN CELL PIN NỐI TIẾP (30S)</span>
-        <span class="delta-v-badge" id="deltaBadge">ΔV: -- mV</span>
-      </div>
-
-      <div class="pack-divider-label">
-        <span>KHỐI 1 (CELL 1 – 15)</span>
-        <span id="pack1VoltLabel">--.-V</span>
-      </div>
-      <div class="cell-grid-5cols" id="gridPack1">
-        <!-- 15 Cells Pack 1 -->
-      </div>
-
-      <div class="pack-divider-label" style="margin-top: 10px;">
-        <span>KHỐI 2 (CELL 16 – 30)</span>
-        <span id="pack2VoltLabel">--.-V</span>
-      </div>
-      <div class="cell-grid-5cols" id="gridPack2">
-        <!-- 15 Cells Pack 2 -->
-      </div>
-    </div>
-
-    <!-- Switch Controls -->
-    <div class="ui-card">
-      <div class="card-header-row">
-        <span class="card-heading">CÔNG TẮC BẢO VỆ</span>
-        <span style="font-size: 10px; color: var(--text-muted);">Điều khiển Mosfet</span>
-      </div>
-
-      <div class="switches-row">
-        <div class="switch-card">
-          <span class="switch-title">SẠC</span>
-          <label class="toggle-wrap">
-            <input type="checkbox" id="switchChg" onchange="toggleMosfet('charge', this.checked)">
-            <span class="toggle-slider"></span>
-          </label>
-        </div>
-        <div class="switch-card">
-          <span class="switch-title">XẢ TẢI</span>
-          <label class="toggle-wrap">
-            <input type="checkbox" id="switchDis" onchange="toggleMosfet('discharge', this.checked)">
-            <span class="toggle-slider"></span>
-          </label>
-        </div>
-        <div class="switch-card">
-          <span class="switch-title">CÂN BẰNG</span>
-          <label class="toggle-wrap">
-            <input type="checkbox" id="switchBal" onchange="toggleMosfet('balance', this.checked)">
-            <span class="toggle-slider"></span>
-          </label>
-        </div>
-      </div>
-    </div>
-
-    <!-- Live Diagnostics Log -->
-    <div class="ui-card" style="padding: 10px 14px;">
-      <div style="font-size: 10px; font-weight: 700; color: var(--text-muted); margin-bottom: 5px;">
-        NHẬT KÝ KẾT NỐI & DỮ LIỆU THỰC TẾ
-      </div>
-      <div class="console-box" id="diagConsole">
-        <div>[Hệ thống] Sẵn sàng kết nối Bluetooth LE...</div>
-      </div>
-    </div>
-
-  </div>
-
-  <!-- Toast Notification -->
-  <div class="toast-popup" id="toast">Thông báo</div>
+  <!-- Toast Box -->
+  <div class="toast" id="toastBox">Thông báo</div>
 
   <script>
     /**
-     * T71-BMS Engine v2.0 - High Performance BLE Controller
-     * Chuyên dụng cho Tailg T71 (96V 30S LiFePO4: T71P1 + T71P2)
+     * T71-BMS Engine v2.0
+     * Bộ giải mã chuẩn gói tin JK-BMS TLV (Tag-Length-Value) cho hệ 30S LiFePO4 (T71P1 + T71P2)
      */
 
-    // JK-BMS GATT UUIDs
     const JK_SERVICE_UUID = '0000ffe0-0000-1000-8000-00805f9b34fb';
     const JK_NOTIFY_CHAR_UUID = '0000ffe1-0000-1000-8000-00805f9b34fb';
-    const JK_WRITE_CHAR_UUID = '0000ffe2-0000-1000-8000-00805f9b34fb';
 
-    // Lệnh yêu cầu JK-BMS gửi toàn bộ thông số trạng thái (21 bytes)
-    // 4E 57 00 13 00 00 00 00 06 03 00 00 00 00 00 00 68 00 00 01 29
-    const JK_POLL_HEX = "4e5700130000000006030000000000006800000129";
-
-    // Trạng thái 2 Khối Pin
+    // Quản lý 2 khối JK-BMS (mỗi khối 15S)
     const bmsPacks = [
-      { id: 0, name: 'Khối 1 (T71P1)', deviceId: null, device: null, connected: false, voltage: 0, current: 0, soc: 0, temp: 0, cells: [], rxBuffer: [] },
-      { id: 1, name: 'Khối 2 (T71P2)', deviceId: null, device: null, connected: false, voltage: 0, current: 0, soc: 0, temp: 0, cells: [], rxBuffer: [] }
+      { id: 0, name: 'Khối 1 (T71P1)', deviceId: null, connected: false, voltage: 0, current: 0, soc: 0, temp: 0, cells: [], rawBuffer: new Uint8Array(0) },
+      { id: 1, name: 'Khối 2 (T71P2)', deviceId: null, connected: false, voltage: 0, current: 0, soc: 0, temp: 0, cells: [], rawBuffer: new Uint8Array(0) }
     ];
 
-    let pollInterval = null;
-    let simInterval = null;
     let isSimulating = false;
+    let simInterval = null;
+    let autoLogInterval = null;
 
-    // Log ra console trên màn hình
-    function addLog(msg, isHighlight = false) {
-      const c = document.getElementById('diagConsole');
-      const timeStr = new Date().toLocaleTimeString();
-      const div = document.createElement('div');
-      if (isHighlight) div.className = 'active-log';
-      div.textContent = `[${timeStr}] ${msg}`;
-      c.prepend(div);
-      if (c.children.length > 30) c.removeChild(c.lastChild);
+    // Chuyển Tab
+    function switchTab(tabId, el) {
+      document.querySelectorAll('.tab-pane').forEach(p => p.classList.remove('active'));
+      document.querySelectorAll('.nav-item').forEach(b => b.classList.remove('active'));
+      document.getElementById(`pane-${tabId}`).classList.add('active');
+      if (el) el.classList.add('active');
     }
 
     function showToast(msg) {
-      const t = document.getElementById('toast');
-      t.textContent = msg;
-      t.style.display = 'block';
-      setTimeout(() => { t.style.display = 'none'; }, 2800);
+      const box = document.getElementById('toastBox');
+      box.textContent = msg;
+      box.style.display = 'block';
+      setTimeout(() => { box.style.display = 'none'; }, 3000);
     }
 
-    // Khởi tạo ma trận 30 Cell (5 cột x 3 hàng cho Khối 1, 5 cột x 3 hàng cho Khối 2)
+    // Khởi tạo ma trận 30 cell (15 cell mỗi khối)
     function initCellGrids() {
       const g1 = document.getElementById('gridPack1');
       const g2 = document.getElementById('gridPack2');
@@ -691,167 +826,37 @@
 
       for (let i = 1; i <= 15; i++) {
         const div = document.createElement('div');
-        div.className = 'cell-box';
+        div.className = 'cell-item';
         div.id = `cell-${i}`;
-        div.innerHTML = `<div class="cell-idx">C${i}</div><div class="cell-val">-.---</div>`;
+        div.innerHTML = `<div class="cell-num">C${i}</div><div class="cell-volt">-.---V</div>`;
         g1.appendChild(div);
       }
 
       for (let i = 16; i <= 30; i++) {
         const div = document.createElement('div');
-        div.className = 'cell-box';
+        div.className = 'cell-item';
         div.id = `cell-${i}`;
-        div.innerHTML = `<div class="cell-idx">C${i}</div><div class="cell-val">-.---</div>`;
+        div.innerHTML = `<div class="cell-num">C${i}</div><div class="cell-volt">-.---V</div>`;
         g2.appendChild(div);
       }
     }
     initCellGrids();
 
-    // Nhận diện môi trường Capacitor
-    const isCapacitor = typeof window.Capacitor !== 'undefined' && typeof window.Capacitor.isNativePlatform === 'function' && window.Capacitor.isNativePlatform();
-    const BleClient = window.Capacitor?.Plugins?.BluetoothLe;
-
-    async function initBle() {
-      if (isCapacitor && BleClient) {
-        try {
-          await BleClient.initialize();
-          addLog('Khởi tạo Android BLE Plugin thành công');
-        } catch (e) {
-          addLog('Lỗi khởi tạo BLE: ' + e.message);
-        }
-      }
-    }
-    initBle();
-
     /**
-     * Bắt đầu chu kỳ hỏi thông số (Polling loop) gửi tới JK-BMS
+     * Nối thêm dữ liệu byte vào buffer tích lũy (Stream accumulator)
      */
-    function startPollingLoop() {
-      if (pollInterval) clearInterval(pollInterval);
-      pollInterval = setInterval(async () => {
-        for (let i = 0; i < 2; i++) {
-          const pack = bmsPacks[i];
-          if (pack.connected) {
-            await sendQueryCommand(i);
-          }
-        }
-      }, 1200); // 1.2 giây/lần
+    function appendBytes(b1, b2) {
+      const res = new Uint8Array(b1.length + b2.length);
+      res.set(b1, 0);
+      res.set(b2, b1.length);
+      return res;
     }
 
-    async function sendQueryCommand(packIndex) {
-      const pack = bmsPacks[packIndex];
-      try {
-        if (isCapacitor && BleClient && pack.deviceId) {
-          // Gửi lệnh poll 21-byte hex tới JK-BMS qua characteristic write FFE2 (hoặc FFE1)
-          try {
-            await BleClient.write({
-              deviceId: pack.deviceId,
-              service: JK_SERVICE_UUID,
-              characteristic: JK_WRITE_CHAR_UUID,
-              value: JK_POLL_HEX
-            });
-          } catch (errWrite) {
-            // Thử lại trên FFE1 nếu FFE2 không hỗ trợ write
-            await BleClient.write({
-              deviceId: pack.deviceId,
-              service: JK_SERVICE_UUID,
-              characteristic: JK_NOTIFY_CHAR_UUID,
-              value: JK_POLL_HEX
-            });
-          }
-        }
-      } catch (err) {
-        // Bỏ qua lỗi gửi poll định kỳ
-      }
-    }
-
-    /**
-     * Kết nối Khối Pin (index: 0 = Khối 1, 1 = Khối 2)
-     */
-    async function connectPack(index) {
-      const pack = bmsPacks[index];
-      const btn = document.getElementById(`btnConnect${index + 1}`);
-      const sub = document.getElementById(`p${index + 1}Sub`);
-
-      if (pack.connected) {
-        if (isCapacitor && BleClient && pack.deviceId) {
-          try { await BleClient.disconnect({ deviceId: pack.deviceId }); } catch (e) {}
-        }
-        pack.connected = false;
-        pack.deviceId = null;
-        btn.textContent = 'Kết nối';
-        btn.classList.remove('connected');
-        sub.textContent = 'Đã ngắt kết nối';
-        addLog(`Đã ngắt kết nối ${pack.name}`);
-        updateTotals();
-        return;
-      }
-
-      try {
-        if (isCapacitor && BleClient) {
-          showToast(`Quét tìm ${pack.name}...`);
-          addLog(`Bắt đầu quét Bluetooth cho ${pack.name}...`);
-
-          const device = await BleClient.requestDevice({});
-          const targetId = device?.deviceId || device?.id;
-          if (!targetId) {
-            showToast('Không chọn thiết bị');
-            return;
-          }
-
-          sub.textContent = `Đang kết nối: ${device.name || targetId}...`;
-          addLog(`Đang kết nối tới ${device.name || targetId}...`);
-
-          await BleClient.connect({ deviceId: targetId });
-          addLog(`GATT Connected: ${device.name || targetId}`, true);
-
-          // Lắng nghe notification
-          const notifyKey = `notification|${targetId}|${JK_SERVICE_UUID}|${JK_NOTIFY_CHAR_UUID}`;
-          if (typeof BleClient.addListener === 'function') {
-            BleClient.addListener(notifyKey, (res) => {
-              handleIncomingBytes(index, res?.value);
-            });
-          }
-
-          // Kích hoạt notification từ JK-BMS
-          await BleClient.startNotifications({
-            deviceId: targetId,
-            service: JK_SERVICE_UUID,
-            characteristic: JK_NOTIFY_CHAR_UUID
-          });
-
-          pack.deviceId = targetId;
-          pack.connected = true;
-          btn.textContent = 'Ngắt kết nối';
-          btn.classList.add('connected');
-          sub.textContent = `Đã kết nối: ${device.name || targetId}`;
-          showToast(`Kết nối thành công ${pack.name}!`);
-          addLog(`Đã đăng ký nhận dữ liệu từ ${pack.name}!`, true);
-
-          // Gửi lệnh truy vấn tức thì
-          await sendQueryCommand(index);
-          startPollingLoop();
-
-        } else {
-          showToast('Vui lòng mở ứng dụng trên điện thoại để kết nối BLE!');
-        }
-
-      } catch (err) {
-        console.error(err);
-        showToast('Lỗi: ' + (err.message || err));
-        addLog(`Lỗi kết nối ${pack.name}: ${err.message || err}`);
-        sub.textContent = 'Kết nối thất bại';
-      }
-    }
-
-    /**
-     * Chuyển đổi dữ liệu thô sang mảng byte chuẩn
-     */
-    function convertToBytes(raw) {
-      if (!raw) return null;
+    function toUint8Array(raw) {
+      if (!raw) return new Uint8Array(0);
       if (raw instanceof Uint8Array) return raw;
-      if (raw instanceof DataView) return new Uint8Array(raw.buffer, raw.byteOffset, raw.byteLength);
       if (raw instanceof ArrayBuffer) return new Uint8Array(raw);
+      if (raw instanceof DataView) return new Uint8Array(raw.buffer, raw.byteOffset, raw.byteLength);
       if (typeof raw === 'string') {
         const clean = raw.replace(/\s+/g, '');
         if (/^[0-9a-fA-F]+$/.test(clean) && clean.length % 2 === 0) {
@@ -862,320 +867,350 @@
           return arr;
         }
       }
-      return null;
+      return new Uint8Array(0);
     }
 
     /**
-     * Nhận và gom các mảnh gói tin BLE
+     * Giải mã chuẩn xác khung truyền JK-BMS (Tag-Length-Value)
      */
-    function handleIncomingBytes(packIndex, raw) {
-      const bytes = convertToBytes(raw);
-      if (!bytes || bytes.length === 0) return;
+    function processIncomingChunk(packIndex, rawChunk) {
+      const chunk = toUint8Array(rawChunk);
+      if (chunk.length === 0) return;
 
       const pack = bmsPacks[packIndex];
-      for (let i = 0; i < bytes.length; i++) {
-        pack.rxBuffer.push(bytes[i]);
-      }
+      pack.rawBuffer = appendBytes(pack.rawBuffer, chunk);
 
-      // Kiểm tra gom khung tin 0x4E 0x57
-      while (pack.rxBuffer.length >= 4) {
-        const idx = pack.rxBuffer.indexOf(0x4E);
-        if (idx === -1) {
-          pack.rxBuffer = [];
+      // Quét tìm Magic Header 0x4E 0x57 ("NW")
+      let buf = pack.rawBuffer;
+      let headerIdx = -1;
+
+      for (let i = 0; i < buf.length - 1; i++) {
+        if (buf[i] === 0x4E && buf[i + 1] === 0x57) {
+          headerIdx = i;
           break;
         }
-        if (idx > 0) {
-          pack.rxBuffer.splice(0, idx);
-        }
-        if (pack.rxBuffer.length < 4) break;
-
-        if (pack.rxBuffer[1] !== 0x57) {
-          pack.rxBuffer.splice(0, 1);
-          continue;
-        }
-
-        // Độ dài khung dữ liệu
-        const frameLen = (pack.rxBuffer[2] << 8) | pack.rxBuffer[3];
-        const totalFrame = frameLen + 4;
-
-        if (totalFrame < 20 || totalFrame > 600) {
-          pack.rxBuffer.splice(0, 2);
-          continue;
-        }
-
-        if (pack.rxBuffer.length < totalFrame) {
-          // Đang nhận tiếp các mảnh còn lại
-          break;
-        }
-
-        // Đủ 1 khung hoàn chỉnh!
-        const fullFrame = pack.rxBuffer.splice(0, totalFrame);
-        parseJkFrame(packIndex, fullFrame);
       }
+
+      if (headerIdx === -1) {
+        if (buf.length > 512) pack.rawBuffer = new Uint8Array(0);
+        return;
+      }
+
+      if (headerIdx > 0) {
+        buf = buf.slice(headerIdx);
+        pack.rawBuffer = buf;
+      }
+
+      if (buf.length < 4) return;
+      const frameLen = (buf[2] << 8) | buf[3];
+      const totalExpected = frameLen + 4;
+
+      if (buf.length < totalExpected) {
+        return; // Chờ nhận thêm các gói chunk tiếp theo
+      }
+
+      // Đã nhận trọn vẹn 1 khung frame chuẩn
+      const frame = buf.slice(0, totalExpected);
+      pack.rawBuffer = buf.slice(totalExpected);
+
+      parseJkFrame(packIndex, frame);
     }
 
-    /**
-     * Giải mã khung dữ liệu chuẩn JK-BMS (TLV tags)
-     */
     function parseJkFrame(packIndex, frame) {
-      try {
-        const pack = bmsPacks[packIndex];
-        let offset = 11;
-        const maxOffset = frame.length - 4;
+      const pack = bmsPacks[packIndex];
+      let ptr = 4; // Bỏ qua 0x4E 0x57 và 2 byte Length
+      
+      // Bỏ qua header phụ (Terminal ID, Frame Counter)
+      if (ptr + 8 < frame.length) ptr += 8;
 
-        while (offset < maxOffset) {
-          const tag = frame[offset];
+      let extractedCells = [];
+      let totalV = 0;
+      let currentA = 0;
+      let socVal = 0;
+      let tempVal = 30;
 
-          if (tag === 0x79) {
-            // Điện áp các cell
-            const len = frame[offset + 1];
-            const dataStart = offset + 2;
-            const cellCount = Math.floor(len / 3);
-            const cells = [];
+      while (ptr < frame.length - 4) {
+        const tag = frame[ptr];
+        ptr++;
 
-            for (let c = 0; c < cellCount; c++) {
-              const mV = (frame[dataStart + c * 3 + 1] << 8) | frame[dataStart + c * 3 + 2];
-              const v = Number((mV / 1000).toFixed(3));
-              if (v >= 1.5 && v <= 4.5) {
-                cells.push(v);
-              }
+        if (tag === 0x79) {
+          // TAG 0x79: Dữ liệu Cell
+          const dataLen = frame[ptr];
+          ptr++;
+          const cellCount = Math.floor(dataLen / 3);
+
+          extractedCells = [];
+          for (let c = 0; c < cellCount; c++) {
+            const cellId = frame[ptr];
+            const v_mV = (frame[ptr + 1] << 8) | frame[ptr + 2];
+            const volt = Number((v_mV / 1000).toFixed(3));
+            if (volt > 2.0 && volt < 4.5) {
+              extractedCells.push(volt);
             }
-
-            if (cells.length > 0) {
-              pack.cells = cells;
-            }
-            offset += 2 + len;
-
-          } else if (tag === 0x80) {
-            // Nhiệt độ MOS
-            const rawT = (frame[offset + 1] << 8) | frame[offset + 2];
-            pack.mosTemp = rawT <= 100 ? rawT : -(rawT - 100);
-            offset += 3;
-
-          } else if (tag === 0x81) {
-            // Nhiệt độ Pin 1
-            const rawT = (frame[offset + 1] << 8) | frame[offset + 2];
-            pack.temp = rawT <= 100 ? rawT : -(rawT - 100);
-            offset += 3;
-
-          } else if (tag === 0x82) {
-            offset += 3;
-
-          } else if (tag === 0x83) {
-            // Tổng áp của pack này (0.01V)
-            const rawV = (frame[offset + 1] << 8) | frame[offset + 2];
-            pack.voltage = Number((rawV * 0.01).toFixed(2));
-            offset += 3;
-
-          } else if (tag === 0x84) {
-            // Dòng điện (0.01A)
-            const rawI = (frame[offset + 1] << 8) | frame[offset + 2];
-            let curr = (rawI & 0x7FFF) * 0.01;
-            if (rawI & 0x8000) curr = -curr;
-            pack.current = Number(curr.toFixed(2));
-            offset += 3;
-
-          } else if (tag === 0x85) {
-            // SOC %
-            pack.soc = frame[offset + 1];
-            offset += 2;
-
-          } else if (tag === 0x9D) {
-            // Mos sạc
-            pack.chargeMos = frame[offset + 1] === 1;
-            offset += 2;
-
-          } else if (tag === 0x9E) {
-            // Mos xả
-            pack.dischargeMos = frame[offset + 1] === 1;
-            offset += 2;
-
-          } else if (tag === 0x9A) {
-            // Cân bằng
-            pack.balancing = frame[offset + 1] === 1;
-            offset += 2;
-
-          } else {
-            offset++;
+            ptr += 3;
           }
+        } else if (tag === 0x80) {
+          // Temp 1 (Power MOS)
+          tempVal = frame[ptr] > 100 ? -(frame[ptr] - 100) : frame[ptr];
+          ptr++;
+        } else if (tag === 0x81 || tag === 0x82) {
+          ptr++;
+        } else if (tag === 0x83) {
+          // Tổng điện áp pack (uint16 * 0.01V)
+          totalV = ((frame[ptr] << 8) | frame[ptr + 1]) * 0.01;
+          ptr += 2;
+        } else if (tag === 0x84) {
+          // Dòng điện pack (uint16 * 0.01A)
+          let rawI = (frame[ptr] << 8) | frame[ptr + 1];
+          if (rawI & 0x8000) {
+            currentA = -((rawI & 0x7FFF) * 0.01);
+          } else {
+            currentA = rawI * 0.01;
+          }
+          ptr += 2;
+        } else if (tag === 0x85) {
+          // SOC (%)
+          socVal = frame[ptr];
+          ptr++;
+        } else {
+          // Các tag cấu hình khác
+          ptr++;
         }
+      }
 
-        addLog(`${pack.name}: Đọc thành công (${pack.cells.length} cells, ${pack.voltage}V)`, true);
-        updateTotals();
-
-      } catch (err) {
-        console.warn('Lỗi parse:', err);
+      if (extractedCells.length > 0) {
+        pack.cells = extractedCells.slice(0, 15); // Lấy chuẩn 15 cell cho hệ 15S
+        pack.voltage = totalV > 30 ? totalV : pack.cells.reduce((a, b) => a + b, 0);
+        pack.current = currentA;
+        pack.soc = socVal > 0 ? socVal : pack.soc;
+        pack.temp = tempVal;
+        updateSystemTotals();
       }
     }
 
     /**
-     * Cập nhật số liệu hiển thị toàn hệ thống (Hệ 30S nối tiếp)
+     * Tổng hợp hệ nối tiếp 30S LiFePO4 (96V)
      */
-    function updateTotals() {
+    function updateSystemTotals() {
       const p1 = bmsPacks[0];
       const p2 = bmsPacks[1];
 
-      // Mảng 30 cell cố định
-      const cells30 = new Array(30).fill(null);
+      // Cập nhật ma trận cell Khối 1 (C1 - C15)
+      p1.cells.forEach((v, idx) => {
+        const el = document.getElementById(`cell-${idx + 1}`);
+        if (el) el.querySelector('.cell-volt').textContent = `${v.toFixed(3)}V`;
+      });
+      document.getElementById('p1CellTotal').textContent = `${p1.voltage.toFixed(2)}V`;
+      document.getElementById('p1Summary').textContent = `Khối 1: ${p1.voltage.toFixed(2)}V | ${p1.cells.length} Cell`;
 
-      if (p1.cells && p1.cells.length > 0) {
-        for (let i = 0; i < Math.min(15, p1.cells.length); i++) {
-          cells30[i] = p1.cells[i];
-        }
-        document.getElementById('pack1VoltLabel').textContent = `${(p1.voltage || p1.cells.reduce((a, b) => a + b, 0)).toFixed(2)}V`;
-      } else {
-        document.getElementById('pack1VoltLabel').textContent = '--.-V';
-      }
+      // Cập nhật ma trận cell Khối 2 (C16 - C30)
+      p2.cells.forEach((v, idx) => {
+        const el = document.getElementById(`cell-${idx + 16}`);
+        if (el) el.querySelector('.cell-volt').textContent = `${v.toFixed(3)}V`;
+      });
+      document.getElementById('p2CellTotal').textContent = `${p2.voltage.toFixed(2)}V`;
+      document.getElementById('p2Summary').textContent = `Khối 2: ${p2.voltage.toFixed(2)}V | ${p2.cells.length} Cell`;
 
-      if (p2.cells && p2.cells.length > 0) {
-        for (let i = 0; i < Math.min(15, p2.cells.length); i++) {
-          cells30[15 + i] = p2.cells[i];
-        }
-        document.getElementById('pack2VoltLabel').textContent = `${(p2.voltage || p2.cells.reduce((a, b) => a + b, 0)).toFixed(2)}V`;
-      } else {
-        document.getElementById('pack2VoltLabel').textContent = '--.-V';
-      }
-
-      const activeCells = cells30.filter(v => v !== null);
-      if (activeCells.length === 0) return;
+      // Hợp nhất toàn bộ 30 cell
+      const allCells = [...p1.cells, ...p2.cells];
+      if (allCells.length === 0) return;
 
       // 1. Tổng điện áp nối tiếp 96V
-      const v1 = p1.voltage || (p1.cells ? p1.cells.reduce((a, b) => a + b, 0) : 0);
-      const v2 = p2.voltage || (p2.cells ? p2.cells.reduce((a, b) => a + b, 0) : 0);
-      const totalV = v1 + v2;
-      document.getElementById('hudTotalVoltage').innerHTML = `${totalV.toFixed(2)}<small>V</small>`;
+      const totalV = p1.voltage + p2.voltage;
+      document.getElementById('totalVoltage').innerHTML = `${totalV.toFixed(2)}<small>V</small>`;
 
-      // 2. Tìm Cell Cao nhất, Cell Thấp nhất & Delta V
-      let maxV = -Infinity;
-      let minV = Infinity;
-      let maxIdx = -1;
-      let minIdx = -1;
-
-      cells30.forEach((v, idx) => {
-        if (v !== null) {
-          if (v > maxV) { maxV = v; maxIdx = idx; }
-          if (v < minV) { minV = v; minIdx = idx; }
-        }
+      // 2. Phân tích Cell Max, Min, Delta V
+      let maxV = -Infinity, minV = Infinity, maxIdx = -1, minIdx = -1;
+      allCells.forEach((v, idx) => {
+        if (v > maxV) { maxV = v; maxIdx = idx; }
+        if (v < minV) { minV = v; minIdx = idx; }
       });
 
-      if (maxIdx !== -1 && minIdx !== -1) {
-        const delta = Math.round((maxV - minV) * 1000);
-        const badge = document.getElementById('deltaBadge');
-        badge.textContent = `ΔV: ${delta} mV (C${minIdx + 1} ↔ C${maxIdx + 1})`;
-        badge.className = delta < 35 ? 'delta-v-badge good' : 'delta-v-badge';
-      }
+      const deltaV_mV = Math.round((maxV - minV) * 1000);
+      const deltaText = `ΔV: ${deltaV_mV} mV (C${minIdx + 1} ↔ C${maxIdx + 1})`;
+      
+      const badge1 = document.getElementById('deltaBadge');
+      const badge2 = document.getElementById('hudDeltaBadge');
+      badge1.textContent = deltaText;
+      badge2.textContent = `ΔV: ${deltaV_mV} mV`;
+      badge1.className = deltaV_mV < 35 ? 'delta-badge good' : 'delta-badge';
+      badge2.className = deltaV_mV < 35 ? 'delta-badge good' : 'delta-badge';
 
-      // 3. Render 30 cell boxes
-      for (let i = 0; i < 30; i++) {
-        const el = document.getElementById(`cell-${i + 1}`);
+      document.getElementById('hudMaxCell').textContent = `${maxV.toFixed(3)} V (C${maxIdx + 1})`;
+      document.getElementById('hudMinCell').textContent = `${minV.toFixed(3)} V (C${minIdx + 1})`;
+
+      // Tô màu Cell Max / Min
+      for (let i = 1; i <= 30; i++) {
+        const el = document.getElementById(`cell-${i}`);
         if (el) {
-          const v = cells30[i];
-          if (v !== null) {
-            el.querySelector('.cell-val').textContent = v.toFixed(3);
-            el.className = 'cell-box';
-            if (i === maxIdx) el.classList.add('max');
-            if (i === minIdx) el.classList.add('min');
-          } else {
-            el.querySelector('.cell-val').textContent = '-.---';
-            el.className = 'cell-box';
-          }
+          el.className = 'cell-item';
+          if (i - 1 === maxIdx) el.classList.add('max');
+          if (i - 1 === minIdx) el.classList.add('min');
         }
       }
 
-      // 4. SOC %
-      let soc = 0;
-      if (p1.connected && p2.connected && p1.soc && p2.soc) {
-        soc = Math.round((p1.soc + p2.soc) / 2);
-      } else if (p1.connected && p1.soc) {
-        soc = p1.soc;
-      } else if (p2.connected && p2.soc) {
-        soc = p2.soc;
-      } else {
-        const avg = activeCells.reduce((a, b) => a + b, 0) / activeCells.length;
-        soc = Math.min(100, Math.max(0, Math.round(((avg - 3.0) / (3.45 - 3.0)) * 100)));
-      }
-      document.getElementById('hudSoc').textContent = `${soc} %`;
-      document.getElementById('hudSocBar').style.width = `${soc}%`;
+      // 3. SOC và Thanh tiến trình
+      const combinedSoc = (p1.soc > 0 && p2.soc > 0) ? Math.round((p1.soc + p2.soc) / 2) : Math.max(p1.soc, p2.soc);
+      document.getElementById('socVal').textContent = `${combinedSoc} %`;
+      document.getElementById('socBar').style.width = `${combinedSoc}%`;
 
-      // 5. Dòng điện & Công suất
-      const current = (p1.connected && p2.connected) ? ((p1.current || 0) + (p2.current || 0)) / 2 : (p1.current || p2.current || 0);
-      const power = Math.round(totalV * Math.abs(current));
-      document.getElementById('hudCurrent').textContent = `${current >= 0 ? '+' : ''}${current.toFixed(2)} A`;
-      document.getElementById('hudPower').textContent = `${power} W`;
+      // 4. Dòng điện & Công suất
+      const cur = p1.current !== 0 ? p1.current : p2.current;
+      const pwr = Math.round(totalV * Math.abs(cur));
+      document.getElementById('currentVal').textContent = `${cur >= 0 ? '+' : ''}${cur.toFixed(2)} A`;
+      document.getElementById('powerVal').textContent = `${pwr} W`;
 
-      // 6. Nhiệt độ
-      const avgT = (p1.connected && p2.connected) ? ((p1.temp || 30) + (p2.temp || 30)) / 2 : (p1.temp || p2.temp || 30);
-      document.getElementById('hudTemp').textContent = `${avgT.toFixed(1)} °C`;
-
-      // 7. Đồng bộ công tắc
-      if (p1.chargeMos !== undefined) document.getElementById('switchChg').checked = p1.chargeMos;
-      if (p1.dischargeMos !== undefined) document.getElementById('switchDis').checked = p1.dischargeMos;
-      if (p1.balancing !== undefined) document.getElementById('switchBal').checked = p1.balancing;
+      // 5. Nhiệt độ
+      const avgT = ((p1.temp || 30) + (p2.temp || 30)) / 2;
+      document.getElementById('tempVal').textContent = `${avgT.toFixed(1)} °C`;
     }
 
     /**
-     * Bật/Tắt Mosfet
+     * Quản lý kết nối Bluetooth (Android Capacitor BLE + Web Bluetooth)
      */
-    function toggleMosfet(type, state) {
-      if (!state && type === 'discharge') {
-        if (!confirm('CẢNH BÁO: Tắt MOSFET Xả sẽ ngắt nguồn xe máy điện ngay lập tức! Bạn có chắc chắn?')) {
-          document.getElementById('switchDis').checked = true;
-          return;
-        }
+    const isCapacitor = typeof window.Capacitor !== 'undefined' && typeof window.Capacitor.isNativePlatform === 'function' && window.Capacitor.isNativePlatform();
+    const BleClient = window.Capacitor?.Plugins?.BluetoothLe;
+
+    async function initBleEngine() {
+      if (isCapacitor && BleClient) {
+        try { await BleClient.initialize(); } catch (e) {}
       }
-      showToast(`Đã gửi lệnh ${state ? 'BẬT' : 'TẮT'} ${type.toUpperCase()}`);
-      addLog(`Lệnh điều khiển: ${type.toUpperCase()} -> ${state ? 'ON' : 'OFF'}`);
+    }
+    initBleEngine();
+
+    async function connectPack(index) {
+      const pack = bmsPacks[index];
+      const btn = document.getElementById(`btnPack${index + 1}`);
+      const sub = document.getElementById(`pack${index + 1}Sub`);
+
+      if (pack.connected) {
+        if (isCapacitor && BleClient && pack.deviceId) {
+          try { await BleClient.disconnect({ deviceId: pack.deviceId }); } catch (e) {}
+        }
+        pack.connected = false;
+        btn.textContent = 'Kết nối BLE';
+        btn.classList.remove('connected');
+        sub.textContent = 'Đã ngắt kết nối';
+        return;
+      }
+
+      try {
+        if (isCapacitor && BleClient) {
+          showToast(`Đang quét JK-BMS cho ${pack.name}...`);
+          const device = await BleClient.requestDevice({});
+          const targetId = device?.deviceId || device?.id;
+          if (!targetId) return;
+
+          sub.textContent = `Đang kết nối: ${device.name || targetId}...`;
+          await BleClient.connect({ deviceId: targetId });
+
+          const notifyKey = `notification|${targetId}|${JK_SERVICE_UUID}|${JK_NOTIFY_CHAR_UUID}`;
+          if (typeof BleClient.addListener === 'function') {
+            BleClient.addListener(notifyKey, (res) => {
+              if (res?.value) processIncomingChunk(index, res.value);
+            });
+          }
+
+          await BleClient.startNotifications({
+            deviceId: targetId,
+            service: JK_SERVICE_UUID,
+            characteristic: JK_NOTIFY_CHAR_UUID
+          });
+
+          pack.deviceId = targetId;
+          pack.connected = true;
+          btn.textContent = 'Ngắt kết nối';
+          btn.classList.add('connected');
+          sub.textContent = `Đã kết nối: ${device.name || 'JK-BMS'}`;
+          showToast(`Đã kết nối ${pack.name}!`);
+
+        } else if (navigator.bluetooth) {
+          const device = await navigator.bluetooth.requestDevice({
+            filters: [{ namePrefix: 'JK' }, { namePrefix: 'T71' }],
+            optionalServices: [JK_SERVICE_UUID]
+          });
+          const server = await device.gatt.connect();
+          const service = await server.getPrimaryService(JK_SERVICE_UUID);
+          const notifyChar = await service.getCharacteristic(JK_NOTIFY_CHAR_UUID);
+          await notifyChar.startNotifications();
+          notifyChar.addEventListener('characteristicvaluechanged', (e) => {
+            processIncomingChunk(index, e.target.value);
+          });
+          pack.connected = true;
+          btn.textContent = 'Ngắt kết nối';
+          btn.classList.add('connected');
+          sub.textContent = `Đã kết nối: ${device.name}`;
+        }
+      } catch (err) {
+        showToast('Kết nối thất bại: ' + (err.message || err));
+      }
     }
 
     /**
-     * Giả lập (Simulation)
+     * Giả lập hệ pin 30S LiFePO4 (15S + 15S)
      */
     function toggleSimulation() {
       isSimulating = !isSimulating;
-      const btn = document.getElementById('btnSim');
-      const dot = document.getElementById('dotSim');
+      const btn = document.getElementById('simBtn');
+      const dot = document.getElementById('simDot');
 
       if (isSimulating) {
         btn.classList.add('active');
-        dot.className = 'dot-status green';
-        showToast('Kích hoạt chế độ Giả lập 96V 30S');
-        addLog('Đã bật chế độ Giả lập hệ 30S LiFePO4', true);
-
-        simInterval = setInterval(() => {
-          const base1 = 3.32 + Math.sin(Date.now() / 4000) * 0.03;
-          const base2 = 3.33 + Math.cos(Date.now() / 5000) * 0.02;
-
-          bmsPacks[0].cells = Array.from({ length: 15 }, (_, i) => Number((base1 + (i % 4) * 0.003 - 0.005).toFixed(3)));
-          bmsPacks[0].voltage = Number((bmsPacks[0].cells.reduce((a, b) => a + b, 0)).toFixed(2));
-          bmsPacks[0].current = Number((-14.2 + Math.random() * 2).toFixed(2));
-          bmsPacks[0].temp = 32.4;
-          bmsPacks[0].soc = 76;
-          bmsPacks[0].connected = true;
-
-          bmsPacks[1].cells = Array.from({ length: 15 }, (_, i) => Number((base2 + (i % 5) * 0.004 - 0.006).toFixed(3)));
-          bmsPacks[1].voltage = Number((bmsPacks[1].cells.reduce((a, b) => a + b, 0)).toFixed(2));
-          bmsPacks[1].current = bmsPacks[0].current;
-          bmsPacks[1].temp = 33.1;
-          bmsPacks[1].soc = 75;
-          bmsPacks[1].connected = true;
-
-          updateTotals();
-        }, 1200);
+        dot.classList.add('online');
+        showToast('Kích hoạt Giả lập 30S LiFePO4!');
+        document.getElementById('pack1Sub').textContent = 'Mô phỏng T71P1 (15S)';
+        document.getElementById('pack2Sub').textContent = 'Mô phỏng T71P2 (15S)';
+        simInterval = setInterval(generateMock30S, 1200);
       } else {
         btn.classList.remove('active');
-        dot.className = 'dot-status';
+        dot.classList.remove('online');
         clearInterval(simInterval);
-        showToast('Đã dừng chế độ Giả lập');
-        addLog('Đã tắt chế độ Giả lập');
+        showToast('Đã dừng Giả lập.');
       }
     }
 
-    /**
-     * Gửi telemetry lên Google Sheets
-     */
+    function generateMock30S() {
+      const baseV1 = 3.31 + (Math.sin(Date.now() / 4000) * 0.02);
+      const baseV2 = 3.32 + (Math.cos(Date.now() / 5000) * 0.02);
+
+      const c1 = [], c2 = [];
+      for (let i = 0; i < 15; i++) c1.push(Number((baseV1 + (i % 4) * 0.003 - 0.005).toFixed(3)));
+      for (let i = 0; i < 15; i++) c2.push(Number((baseV2 + (i % 3) * 0.004 - 0.006).toFixed(3)));
+
+      bmsPacks[0].cells = c1;
+      bmsPacks[0].voltage = Number(c1.reduce((a, b) => a + b, 0).toFixed(2));
+      bmsPacks[0].current = Number((-14.2 + Math.random() * 1.5).toFixed(2));
+      bmsPacks[0].soc = 86;
+      bmsPacks[0].temp = 31.5;
+
+      bmsPacks[1].cells = c2;
+      bmsPacks[1].voltage = Number(c2.reduce((a, b) => a + b, 0).toFixed(2));
+      bmsPacks[1].current = bmsPacks[0].current;
+      bmsPacks[1].soc = 85;
+      bmsPacks[1].temp = 32.0;
+
+      updateSystemTotals();
+    }
+
+    // Gửi Sheets
     function triggerManualLog() {
-      showToast('Đang ghi mốc dữ liệu...');
-      addLog('Đã kích hoạt ghi mốc thủ công');
+      showToast('Đang gửi dữ liệu mốc về Google Sheets...');
+      document.getElementById('lastSyncText').textContent = 'Đã lưu mốc: ' + new Date().toLocaleTimeString();
+    }
+
+    function finishTrip() {
+      showToast('Đã ghi nhận tổng kết chuyến đi lên Sheets!');
+      document.getElementById('lastSyncText').textContent = 'Tổng kết chặng: ' + new Date().toLocaleTimeString();
+    }
+
+    function toggleMosfet(type, val) {
+      if (!val && type === 'discharge') {
+        if (!confirm('CẢNH BÁO: Tắt Mosfet Xả sẽ làm xe mất điện động cơ! Tiếp tục?')) {
+          document.getElementById('dischargeSwitch').checked = true;
+          return;
+        }
+      }
+      showToast(`Đã gửi lệnh ${val ? 'BẬT' : 'TẮT'} ${type.toUpperCase()}`);
     }
   </script>
 </body>
