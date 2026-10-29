@@ -1,0 +1,27 @@
+{
+  "name": "t71-bms",
+  "version": "1.0.0",
+  "description": "Multi-pack JK-BMS Manager for Tailg T71 Electric Scooter",
+  "main": "src/Index.html",
+  "scripts": {
+    "build": "echo 'No build step required for static assets'",
+    "cap:sync": "cap sync",
+    "cap:add:android": "cap add android"
+  },
+  "dependencies": {
+    "@capacitor/android": "^7.0.0",
+    "@capacitor/cli": "^7.0.0",
+    "@capacitor/core": "^7.0.0",
+    "@capacitor-community/bluetooth-le": "^7.0.0"
+  },
+  "keywords": [
+    "jkbms",
+    "bms",
+    "tailg",
+    "capacitor",
+    "android",
+    "bluetooth-le"
+  ],
+  "author": "Luahty",
+  "license": "MIT"
+}

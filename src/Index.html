@@ -696,15 +696,32 @@
     initCellGrid(32);
 
     /**
-     * Web Bluetooth - Quét và kết nối từng khối JK-BMS
+     * Web Bluetooth & Capacitor Native BLE Manager
      */
+    const isCapacitor = typeof window.Capacitor !== 'undefined' && typeof window.Capacitor.isNativePlatform === 'function' && window.Capacitor.isNativePlatform();
+    const BleClient = window.Capacitor?.Plugins?.BluetoothLe;
+
+    async function initBleEngine() {
+      if (isCapacitor && BleClient) {
+        try {
+          await BleClient.initialize();
+          console.log('Capacitor BluetoothLe Initialized');
+        } catch (e) {
+          console.warn('BluetoothLe init warning:', e);
+        }
+      }
+    }
+    initBleEngine();
+
     async function connectPack(index) {
       const pack = bmsPacks[index];
       const btn = document.getElementById(`btnPack${index + 1}`);
       const sub = document.getElementById(`pack${index + 1}Sub`);
 
       if (pack.connected) {
-        if (pack.device && pack.device.gatt.connected) {
+        if (isCapacitor && BleClient && pack.deviceId) {
+          try { await BleClient.disconnect(pack.deviceId); } catch (e) {}
+        } else if (pack.device && pack.device.gatt && pack.device.gatt.connected) {
           pack.device.gatt.disconnect();
         }
         pack.connected = false;
@@ -716,47 +733,81 @@
       }
 
       try {
-        if (!navigator.bluetooth) {
-          showToast('Trình duyệt chưa hỗ trợ Web Bluetooth. Vui lòng bật cờ hoặc dùng Chrome!');
-          return;
+        if (isCapacitor && BleClient) {
+          // Kết nối thông qua Capacitor Native BLE Plugin (Dành cho App Android APK)
+          showToast(`Đang quét JK-BMS qua Android BLE cho ${pack.name}...`);
+          const device = await BleClient.requestDevice({
+            namePrefix: 'JK'
+          });
+
+          if (!device || !device.deviceId) {
+            showToast('Không tìm thấy thiết bị');
+            return;
+          }
+
+          sub.textContent = `Đang kết nối: ${device.name || device.deviceId}...`;
+          await BleClient.connect(device.deviceId);
+
+          await BleClient.startNotifications(
+            device.deviceId,
+            JK_SERVICE_UUID,
+            JK_NOTIFY_CHAR_UUID,
+            (val) => {
+              handleBmsPacket(index, val);
+            }
+          );
+
+          pack.deviceId = device.deviceId;
+          pack.connected = true;
+          btn.textContent = 'Ngắt kết nối';
+          btn.classList.add('connected');
+          sub.textContent = `Đã kết nối: ${device.name || 'JK-BMS'}`;
+          showToast(`Đã kết nối thành công ${pack.name}!`);
+
+        } else {
+          // Kết nối thông qua Web Bluetooth API của trình duyệt
+          if (!navigator.bluetooth) {
+            showToast('Trình duyệt chưa hỗ trợ Web Bluetooth. Hãy dùng Chrome hoặc cài bản APK!');
+            return;
+          }
+
+          showToast(`Đang quét tìm JK-BMS cho ${pack.name}...`);
+          const device = await navigator.bluetooth.requestDevice({
+            filters: [
+              { namePrefix: 'JK' },
+              { namePrefix: 'BMS' }
+            ],
+            optionalServices: [JK_SERVICE_UUID, '0000ffe0-0000-1000-8000-00805f9b34fb']
+          });
+
+          sub.textContent = 'Đang kết nối GATT...';
+          const server = await device.gatt.connect();
+          const service = await server.getPrimaryService(JK_SERVICE_UUID);
+          const notifyChar = await service.getCharacteristic(JK_NOTIFY_CHAR_UUID);
+
+          await notifyChar.startNotifications();
+          notifyChar.addEventListener('characteristicvaluechanged', (e) => {
+            handleBmsPacket(index, e.target.value);
+          });
+
+          pack.device = device;
+          pack.server = server;
+          pack.characteristic = notifyChar;
+          pack.connected = true;
+
+          btn.textContent = 'Ngắt kết nối';
+          btn.classList.add('connected');
+          sub.textContent = `Đã kết nối: ${device.name || 'JK-BMS'}`;
+          showToast(`Đã kết nối thành công ${pack.name}!`);
+
+          device.addEventListener('gattserverdisconnected', () => {
+            pack.connected = false;
+            btn.textContent = 'Kết nối BLE';
+            btn.classList.remove('connected');
+            sub.textContent = 'Mất kết nối Bluetooth';
+            updateSystemTotals();
+          });
         }
-
-        showToast(`Đang quét tìm JK-BMS cho ${pack.name}...`);
-        const device = await navigator.bluetooth.requestDevice({
-          filters: [
-            { namePrefix: 'JK' },
-            { namePrefix: 'BMS' }
-          ],
-          optionalServices: [JK_SERVICE_UUID, '0000ffe0-0000-1000-8000-00805f9b34fb']
-        });
-
-        sub.textContent = 'Đang kết nối GATT...';
-        const server = await device.gatt.connect();
-        const service = await server.getPrimaryService(JK_SERVICE_UUID);
-        const notifyChar = await service.getCharacteristic(JK_NOTIFY_CHAR_UUID);
-
-        await notifyChar.startNotifications();
-        notifyChar.addEventListener('characteristicvaluechanged', (e) => {
-          handleBmsPacket(index, e.target.value);
-        });
-
-        pack.device = device;
-        pack.server = server;
-        pack.characteristic = notifyChar;
-        pack.connected = true;
-
-        btn.textContent = 'Ngắt kết nối';
-        btn.classList.add('connected');
-        sub.textContent = `Đã kết nối: ${device.name || 'JK-BMS'}`;
-        showToast(`Đã kết nối thành công ${pack.name}!`);
-
-        device.addEventListener('gattserverdisconnected', () => {
-          pack.connected = false;
-          btn.textContent = 'Kết nối BLE';
-          btn.classList.remove('connected');
-          sub.textContent = 'Mất kết nối Bluetooth';
-          updateSystemTotals();
-        });
 
       } catch (err) {
         console.error(err);
@@ -988,12 +1039,31 @@
           })
           .recordTelemetry(payload);
       } else {
-        // Chạy môi trường độc lập cục bộ
-        setTimeout(() => {
-          const timeStr = new Date().toLocaleTimeString();
-          document.getElementById('lastSyncText').textContent = `Đã lưu (Demo): ${timeStr}`;
-          showToast('Đã ghi nhận mốc dữ liệu!');
-        }, 600);
+        // Chạy trên App APK hoặc môi trường Web ngoài
+        const scriptWebAppUrl = localStorage.getItem('t71_apps_script_url') || '';
+        if (scriptWebAppUrl) {
+          fetch(scriptWebAppUrl, {
+            method: 'POST',
+            mode: 'no-cors',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+          })
+          .then(() => {
+            const timeStr = new Date().toLocaleTimeString();
+            document.getElementById('lastSyncText').textContent = `Đã lưu API: ${timeStr}`;
+            showToast('Đã gửi dữ liệu về Google Sheets!');
+          })
+          .catch(err => {
+            console.warn('API error:', err);
+            document.getElementById('lastSyncText').textContent = 'Lỗi gửi Sheets API';
+          });
+        } else {
+          setTimeout(() => {
+            const timeStr = new Date().toLocaleTimeString();
+            document.getElementById('lastSyncText').textContent = `Đã lưu (Demo): ${timeStr}`;
+            showToast('Đã ghi nhận mốc dữ liệu!');
+          }, 600);
+        }
       }
     }
 
