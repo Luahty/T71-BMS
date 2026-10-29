@@ -520,7 +520,7 @@
     <!-- Main HUD Voltage & SOC -->
     <div class="card hud-main">
       <div class="hud-top-row">
-        <span class="tag-profile" id="vehicleProfileText">TAILG T71 (96V 32S)</span>
+        <span class="tag-profile" id="vehicleProfileText">TAILG T71 (96V 30S LiFePO4)</span>
         <div class="battery-soc-pill">
           <span>⚡ SOC:</span>
           <span id="socVal">-- %</span>
@@ -562,7 +562,7 @@
           <div class="pack-info">
             <div class="pack-icon">🔋</div>
             <div>
-              <div class="pack-name" id="pack1Name">Khối 1: JK-BMS (48V / 16S)</div>
+              <div class="pack-name" id="pack1Name">Khối 1: JK-BMS (48V / 15S)</div>
               <div class="pack-sub" id="pack1Sub">Chưa kết nối</div>
             </div>
           </div>
@@ -574,7 +574,7 @@
           <div class="pack-info">
             <div class="pack-icon">🔋</div>
             <div>
-              <div class="pack-name" id="pack2Name">Khối 2: JK-BMS (48V / 16S)</div>
+              <div class="pack-name" id="pack2Name">Khối 2: JK-BMS (48V / 15S)</div>
               <div class="pack-sub" id="pack2Sub">Chưa kết nối</div>
             </div>
           </div>
@@ -586,11 +586,11 @@
     <!-- Cell Voltage Matrix -->
     <div class="card">
       <div class="section-title">
-        <span>MA TRẬN CELL PIN NỐI TIẾP (32S)</span>
+        <span>MA TRẬN CELL PIN NỐI TIẾP (30S LiFePO4)</span>
         <span class="delta-badge" id="deltaBadge">ΔV: -- mV</span>
       </div>
       <div class="cell-grid" id="cellGrid">
-        <!-- Render 32 cells dynamically -->
+        <!-- Render 30 cells dynamically -->
       </div>
     </div>
 
@@ -693,7 +693,25 @@
         grid.appendChild(div);
       }
     }
-    initCellGrid(32);
+    initCellGrid(30);
+
+    // Chuyển đổi dữ liệu hex / string sang DataView
+    function parseToDataView(raw) {
+      if (!raw) return null;
+      if (raw instanceof DataView) return raw;
+      if (raw instanceof ArrayBuffer) return new DataView(raw);
+      if (typeof raw === 'string') {
+        const cleanHex = raw.replace(/\s+/g, '');
+        if (/^[0-9a-fA-F]+$/.test(cleanHex) && cleanHex.length % 2 === 0) {
+          const bytes = new Uint8Array(cleanHex.length / 2);
+          for (let i = 0; i < cleanHex.length; i += 2) {
+            bytes[i / 2] = parseInt(cleanHex.substr(i, 2), 16);
+          }
+          return new DataView(bytes.buffer);
+        }
+      }
+      return null;
+    }
 
     /**
      * Web Bluetooth & Capacitor Native BLE Manager
@@ -720,7 +738,7 @@
 
       if (pack.connected) {
         if (isCapacitor && BleClient && pack.deviceId) {
-          try { await BleClient.disconnect(pack.deviceId); } catch (e) {}
+          try { await BleClient.disconnect({ deviceId: pack.deviceId }); } catch (e) {}
         } else if (pack.device && pack.device.gatt && pack.device.gatt.connected) {
           pack.device.gatt.disconnect();
         }
@@ -735,28 +753,36 @@
       try {
         if (isCapacitor && BleClient) {
           // Kết nối thông qua Capacitor Native BLE Plugin (Dành cho App Android APK)
-          showToast(`Đang quét tất cả thiết bị BLE (Đảm bảo đã BẬT GPS)...`);
-          // Không giới hạn bộ lọc namePrefix để tìm thấy tất cả thiết bị BMS và tên tùy chỉnh
+          showToast(`Đang quét thiết bị BLE (Đảm bảo đã BẬT GPS)...`);
           const device = await BleClient.requestDevice({});
 
-          if (!device || !device.deviceId) {
-            showToast('Không tìm thấy thiết bị');
+          const targetId = device?.deviceId || device?.id || (typeof device === 'string' ? device : null);
+          if (!targetId) {
+            showToast('Không lấy được mã thiết bị');
             return;
           }
 
-          sub.textContent = `Đang kết nối: ${device.name || device.deviceId}...`;
-          await BleClient.connect(device.deviceId);
+          sub.textContent = `Đang kết nối: ${device.name || targetId}...`;
 
-          await BleClient.startNotifications(
-            device.deviceId,
-            JK_SERVICE_UUID,
-            JK_NOTIFY_CHAR_UUID,
-            (val) => {
-              handleBmsPacket(index, val);
-            }
-          );
+          // Bắt buộc truyền tham số dạng đối tượng { deviceId: ... }
+          await BleClient.connect({ deviceId: targetId });
 
-          pack.deviceId = device.deviceId;
+          // Lắng nghe dữ liệu notify từ JK-BMS
+          const notifyKey = `notification|${targetId}|${JK_SERVICE_UUID}|${JK_NOTIFY_CHAR_UUID}`;
+          if (typeof BleClient.addListener === 'function') {
+            BleClient.addListener(notifyKey, (res) => {
+              const dv = parseToDataView(res?.value);
+              if (dv) handleBmsPacket(index, dv);
+            });
+          }
+
+          await BleClient.startNotifications({
+            deviceId: targetId,
+            service: JK_SERVICE_UUID,
+            characteristic: JK_NOTIFY_CHAR_UUID
+          });
+
+          pack.deviceId = targetId;
           pack.connected = true;
           btn.textContent = 'Ngắt kết nối';
           btn.classList.add('connected');
@@ -966,17 +992,17 @@
     }
 
     function generateMockData() {
-      // Tạo dao động điện áp 32 cell quanh 3.28V - 3.33V (LiFePO4)
+      // Tạo dao động điện áp 30 cell quanh 3.28V - 3.33V (Hệ pin sắt LiFePO4 30S)
       const baseV1 = 3.30 + (Math.sin(Date.now() / 5000) * 0.04);
       const baseV2 = 3.31 + (Math.cos(Date.now() / 6000) * 0.03);
 
       const cells1 = [];
-      for (let i = 0; i < 16; i++) {
+      for (let i = 0; i < 15; i++) {
         cells1.push(Number((baseV1 + ((i % 5) * 0.004) - 0.01).toFixed(3)));
       }
 
       const cells2 = [];
-      for (let i = 0; i < 16; i++) {
+      for (let i = 0; i < 15; i++) {
         cells2.push(Number((baseV2 + ((i % 4) * 0.005) - 0.008).toFixed(3)));
       }
 
